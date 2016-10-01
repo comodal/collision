@@ -2,5 +2,4 @@
 build/
 /collision.ipr
 /collision.iws
-gradle/
 .idea/
