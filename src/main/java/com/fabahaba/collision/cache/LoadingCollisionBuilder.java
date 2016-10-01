@@ -5,6 +5,8 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
+import static com.fabahaba.collision.cache.CollisionBuilder.DEFAULT_SPARSE_FACTOR;
+
 public final class LoadingCollisionBuilder<K, L, V> {
 
   private final KeyedCollisionBuilder<K, V> delegate;
@@ -19,7 +21,11 @@ public final class LoadingCollisionBuilder<K, L, V> {
   }
 
   public LoadingCollisionCache<K, L, V> buildSparse() {
-    return delegate.buildSparse(loader, mapper);
+    return buildSparse(DEFAULT_SPARSE_FACTOR);
+  }
+
+  public LoadingCollisionCache<K, L, V> buildSparse(final double sparseFactor) {
+    return delegate.buildSparse(sparseFactor, loader, mapper);
   }
 
   public LoadingCollisionCache<K, L, V> buildPacked() {

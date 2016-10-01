@@ -89,4 +89,6 @@ public interface CollisionCache<K, V> {
    * @return the value in pre-existing in the cache for this key.
    */
   V getIfPresentVolatile(final K key);
+
+  void clear();
 }

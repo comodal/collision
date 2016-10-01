@@ -23,7 +23,7 @@ final class ComputeBenchmark {
 
   static final int NUM_ITERS = 10;
   static final int SIZE = 1 << 20;
-  static final int CAP = (int) ((1 << 17) * 1.5);
+  static final int CAP = (int) ((1 << 17) * 1.0);
   static final int ITEMS = SIZE / 3;
   private static final Integer[] VALUES = new Integer[SIZE];
 
@@ -105,7 +105,7 @@ final class ComputeBenchmark {
         .disableStatistics(true)
         .entryCapacity(CAP)
         .sharpExpiry(false)
-        .strictEviction(false).loader(new CacheLoader<>() {
+        .strictEviction(false).loader(new CacheLoader<Integer, Integer>() {
           public Integer load(final Integer key) throws Exception {
             return LOADER.apply(key);
           }
@@ -152,12 +152,12 @@ final class ComputeBenchmark {
 
   static ComputeBenchmark createSparseCollision() {
     final CollisionCache<Integer, Integer> cache = startCollision()
-        .setStoreKeys(false).buildSparse();
+        .setStoreKeys(false).buildSparse(3.0);
     return new ComputeBenchmark(cache, key -> cache.get(key));
   }
 
   static ComputeBenchmark createSparseEntryCollision() {
-    final CollisionCache<Integer, Integer> cache = startCollision().buildSparse();
+    final CollisionCache<Integer, Integer> cache = startCollision().buildSparse(3.0);
     return new ComputeBenchmark(cache, key -> cache.get(key));
   }
 
@@ -172,8 +172,8 @@ final class ComputeBenchmark {
     //createCaffeine().testParallel(memUsage);
     //createPackedCollision().testParallel(memUsage);
     // createPackedEntryCollision().testParallel(memUsage);
-    createSparseCollision().testParallel(memUsage);
-    //createSparseEntryCollision().testParallel(memUsage);
+    //createSparseCollision().testParallel(memUsage);
+    createSparseEntryCollision().testParallel(memUsage);
     //createConcurrentMap().testParallel(memUsage);
   }
 }

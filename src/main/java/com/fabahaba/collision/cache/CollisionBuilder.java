@@ -21,8 +21,15 @@ public final class CollisionBuilder<V> {
     this.capacity = capacity;
   }
 
+  static final double DEFAULT_SPARSE_FACTOR = 2.0;
+
   public <K> CollisionCache<K, V> buildSparse() {
+    return buildSparse(DEFAULT_SPARSE_FACTOR);
+  }
+
+  public <K> CollisionCache<K, V> buildSparse(final double sparseFactor) {
     return buildSparse(
+        sparseFactor,
         new KeyedCollisionBuilder.DefaultHashCoder<>(),
         new KeyedCollisionBuilder.DefaultIsValForKey<>(),
         key -> null,
@@ -30,6 +37,7 @@ public final class CollisionBuilder<V> {
   }
 
   <K, L> LoadingCollisionCache<K, L, V> buildSparse(
+      final double sparseFactor,
       final ToIntFunction<K> hashCoder,
       final BiPredicate<K, Object> isValForKey,
       final Function<K, L> loader,
@@ -37,7 +45,8 @@ public final class CollisionBuilder<V> {
     final int bucketSize = this.bucketSize > 0 ? this.bucketSize : 4;
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
-    final byte[] counters = new byte[Integer.highestOneBit((capacity * 2) - 1) << 1];
+    final byte[] counters = new byte[Integer
+        .highestOneBit((int) (capacity * Math.max(1.0, sparseFactor)) - 1) << 1];
     final int pow2LogFactor = LogCounterCache.calcLogFactorShift(maxCounterVal);
     final int hashTableLength = counters.length >> maxCollisionsShift;
     if (isStoreKeys()) {

@@ -1,10 +1,12 @@
 package com.fabahaba.collision.cache;
 
 import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
 
 abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
     implements LoadingCollisionCache<K, L, V> {
@@ -141,6 +143,12 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
       }
     } while (++index < collisions.length);
     return null;
+  }
+
+  @Override
+  public void clear() {
+    IntStream.range(0, hashTable.length).parallel()
+        .forEach(i -> Arrays.fill(hashTable[i], null));
   }
 
   @Override
