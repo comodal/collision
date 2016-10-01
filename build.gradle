@@ -44,6 +44,12 @@ dependencies {
   testCompile 'org.cache2k:cache2k-core:+'
 }
 
+test {
+  testLogging {
+    events "passed", "skipped", "failed", "standardOut", "standardError"
+  }
+}
+
 sourceSets {
   test {
     java {

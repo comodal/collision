@@ -125,33 +125,4 @@ public class CollisionCacheTest {
     final byte[] hashBytes = sha3MessageDigest512.get().digest(intStringBytes);
     return new BigInteger(1, hashBytes).toString(16);
   }
-
-  static class Key {
-
-  }
-
-  static class Value {
-
-    public Key getGUID() {
-      return null;
-    }
-  }
-
-  static byte[] loadFromDisk(final Key key) {
-    return new byte[0];
-  }
-
-  static Value deserialize(final byte[] data) {
-    return null;
-  }
-
-  public void demo() {
-    final CollisionCache<Key, Value> cache = CollisionCache
-        .<Value>withCapacity(1_048_576)
-        .<Key, byte[]>setLoader(
-            key -> loadFromDisk(key),
-            (key, val) -> deserialize(val))
-        .setIsValForKey((key, val) -> ((Value) val).getGUID().equals(key))
-        .buildSparse();
-  }
 }
