@@ -45,8 +45,12 @@ The number of slots in the hash table is the next power of two greater than `cap
 ####Sparse Caches
 The number of elements is explicitly tracked and can be strictly limited to `capacity` or allowed to temporarily go over `capacity` and organically decay back down as buckets with multiple entries are accessed.
 
-The number of slots in the hash table is the next power of two greater than `(sparseFactory * capacity) - 1`.  `sparseFactor` is 2.0 by default.
+The number of slots in the hash table is the next power of two greater than `(sparseFactor * capacity) - 1`.
 
 By default the hash table, a two dimensional array, is completely initialized.  If using a large `sparseFactor` consider setting `lazyInitBuckets` to true to save space.
 
-If not strictly limiting the capacity the number of entries can exceed capacity by `(nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)`.  `bucketSize` is 4 by default.  For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.
+If not strictly limiting the capacity the number of entries can exceed capacity by:
+```
+(nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)
+```
+For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.
