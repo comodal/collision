@@ -58,7 +58,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {
     int index = 0;
     synchronized (collisions) {
@@ -79,7 +79,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   @SuppressWarnings("unchecked")
-  private V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final Map.Entry<K, V> entry) {
     int index = 0;
     synchronized (collisions) {
@@ -103,7 +103,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    * @param collisions    values sitting in a hash bucket.
    * @param entry         The value to put in place of the least frequently used value.
    */
-  private void decayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private void decayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final Map.Entry<K, V> entry) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
@@ -142,11 +142,15 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       Map.Entry<K, V> collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
       if (collision == null) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         collision = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (collision == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           return val;
@@ -161,8 +165,11 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         return val;
       }
       if (key.equals(collision.getKey())) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, collision, newEntry);
         if (witness == collision) {
           return val;
         }
@@ -180,8 +187,11 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return val;
         }
         if (key.equals(collision.getKey())) {
+          if (newEntry == null) {
+            newEntry = Map.entry(key, val);
+          }
           final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-              .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+              .compareAndExchangeRelease(collisions, index, collision, newEntry);
           if (witness == collision) {
             return val;
           }
@@ -191,7 +201,10 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
         }
       } while (++index < collisions.length);
-      decayAndSwapLFU(hash << maxCollisionsShift, collisions, Map.entry(key, val));
+      if (newEntry == null) {
+        newEntry = Map.entry(key, val);
+      }
+      decayAndSwapLFU(hash << maxCollisionsShift, collisions, newEntry);
     }
     return val;
   }
@@ -205,11 +218,15 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       final Map.Entry<K, V> collision = collisions[index];
       if (collision == null) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (witness == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           return val;
@@ -231,7 +248,10 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.getValue();
         }
       } while (++index < collisions.length);
-      decayAndSwapLFU(hash << maxCollisionsShift, collisions, Map.entry(key, val));
+      if (newEntry == null) {
+        newEntry = Map.entry(key, val);
+      }
+      decayAndSwapLFU(hash << maxCollisionsShift, collisions, newEntry);
     }
     return val;
   }
@@ -245,11 +265,15 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       final Map.Entry<K, V> collision = collisions[index];
       if (collision == null) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (witness == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           return val;
@@ -275,11 +299,15 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       Map.Entry<K, V> collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
       if (collision == null) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         collision = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (collision == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           return val;
@@ -294,8 +322,11 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         return val;
       }
       if (key.equals(collision.getKey())) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, collision, newEntry);
         if (witness == collision) {
           return val;
         }

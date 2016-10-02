@@ -9,7 +9,11 @@ import java.util.function.ToIntFunction;
 
 public final class CollisionBuilder<V> {
 
+  static final int DEFAULT_SPARSE_BUCKET_SIZE = 4;
+  static final int DEFAULT_PACKED_BUCKET_SIZE = 8;
+
   private final int capacity;
+  private boolean strictCapacity = false;
   private Class<V> valueType;
   private int bucketSize = 0;
   private int initCount = 5;
@@ -21,6 +25,11 @@ public final class CollisionBuilder<V> {
     this.capacity = capacity;
   }
 
+  /**
+   * Multiplied by the desired capacity to determine the hash table length.
+   * Increase to reduce collisions.
+   * If increasing consider lazyInitBuckets to prevent unnecessary array creation.
+   */
   static final double DEFAULT_SPARSE_FACTOR = 2.0;
 
   public <K> CollisionCache<K, V> buildSparse() {
@@ -42,7 +51,7 @@ public final class CollisionBuilder<V> {
       final BiPredicate<K, Object> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
-    final int bucketSize = this.bucketSize > 0 ? this.bucketSize : 4;
+    final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_SPARSE_BUCKET_SIZE;
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
     final byte[] counters = new byte[Integer
@@ -53,6 +62,7 @@ public final class CollisionBuilder<V> {
       final Map.Entry<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
       return new SparseEntryCollisionCache<>(
           capacity,
+          strictCapacity,
           maxCollisionsShift,
           counters,
           initCount,
@@ -63,6 +73,7 @@ public final class CollisionBuilder<V> {
     final V[][] hashTable = createHashTable(hashTableLength, maxCollisions);
     return new SparseCollisionCache<>(
         capacity,
+        strictCapacity,
         valueType,
         maxCollisionsShift,
         counters,
@@ -85,7 +96,7 @@ public final class CollisionBuilder<V> {
       final BiPredicate<K, Object> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
-    final int bucketSize = this.bucketSize > 0 ? this.bucketSize : 8;
+    final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_PACKED_BUCKET_SIZE;
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
     final byte[] counters = new byte[Integer.highestOneBit(capacity - 1) << 1];
@@ -157,6 +168,15 @@ public final class CollisionBuilder<V> {
 
   public int getCapacity() {
     return capacity;
+  }
+
+  public boolean isStrictCapacity() {
+    return strictCapacity;
+  }
+
+  public CollisionBuilder setStrictCapacity(final boolean strictCapacity) {
+    this.strictCapacity = strictCapacity;
+    return this;
   }
 
   public Class<V> getValueType() {

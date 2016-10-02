@@ -45,6 +45,15 @@ public final class LoadingCollisionBuilder<K, L, V> {
     return this;
   }
 
+  public boolean isStrictCapacity() {
+    return delegate.isStrictCapacity();
+  }
+
+  public LoadingCollisionBuilder<K, L, V> setStrictCapacity(final boolean strictCapacity) {
+    delegate.setStrictCapacity(strictCapacity);
+    return this;
+  }
+
   public Class<V> getValueType() {
     return delegate.getValueType();
   }

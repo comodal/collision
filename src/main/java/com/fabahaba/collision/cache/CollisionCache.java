@@ -91,4 +91,6 @@ public interface CollisionCache<K, V> {
   V getIfPresentVolatile(final K key);
 
   void clear();
+
+  void nullBuckets();
 }

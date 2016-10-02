@@ -116,6 +116,15 @@ public final class KeyedCollisionBuilder<K, V> {
     return this;
   }
 
+  public boolean isStrictCapacity() {
+    return delegate.isStrictCapacity();
+  }
+
+  public KeyedCollisionBuilder<K, V> setStrictCapacity(final boolean strictCapacity) {
+    delegate.setStrictCapacity(strictCapacity);
+    return this;
+  }
+
   public Class<V> getValueType() {
     return delegate.getValueType();
   }

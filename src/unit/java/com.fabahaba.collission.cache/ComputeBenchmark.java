@@ -152,7 +152,7 @@ final class ComputeBenchmark {
 
   static ComputeBenchmark createSparseCollision() {
     final CollisionCache<Integer, Integer> cache = startCollision()
-        .setStoreKeys(false).buildSparse(3.0);
+        .setStoreKeys(false).setStrictCapacity(false).buildSparse(3.0);
     return new ComputeBenchmark(cache, key -> cache.get(key));
   }
 
@@ -171,9 +171,9 @@ final class ComputeBenchmark {
     //createCache2k().testParallel(memUsage);
     //createCaffeine().testParallel(memUsage);
     //createPackedCollision().testParallel(memUsage);
-    // createPackedEntryCollision().testParallel(memUsage);
-    //createSparseCollision().testParallel(memUsage);
-    createSparseEntryCollision().testParallel(memUsage);
+    //createPackedEntryCollision().testParallel(memUsage);
+    createSparseCollision().testParallel(memUsage);
+    //createSparseEntryCollision().testParallel(memUsage);
     //createConcurrentMap().testParallel(memUsage);
   }
 }

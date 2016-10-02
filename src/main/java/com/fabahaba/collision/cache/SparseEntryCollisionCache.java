@@ -9,15 +9,24 @@ import java.util.function.ToIntFunction;
 final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K, L, V> {
 
   private final int capacity;
+  private final boolean strict;
   private final AtomicInteger size;
 
-  SparseEntryCollisionCache(final int capacity, final int maxCollisionsShift,
-      final byte[] counters, final int initCount, final int pow2LogFactor,
-      final Map.Entry<K, V>[][] hashTable, final ToIntFunction<K> hashCoder,
-      final Function<K, L> loader, final BiFunction<K, L, V> mapper) {
+  SparseEntryCollisionCache(
+      final int capacity,
+      final boolean strictCapacity,
+      final int maxCollisionsShift,
+      final byte[] counters,
+      final int initCount,
+      final int pow2LogFactor,
+      final Map.Entry<K, V>[][] hashTable,
+      final ToIntFunction<K> hashCoder,
+      final Function<K, L> loader,
+      final BiFunction<K, L, V> mapper) {
     super(maxCollisionsShift, counters, initCount, pow2LogFactor, hashTable, hashCoder,
         loader, mapper);
     this.capacity = capacity;
+    this.strict = strictCapacity;
     this.size = new AtomicInteger();
   }
 
@@ -38,8 +47,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         if (loaded == null) {
           return null;
         }
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return mapper.apply(key, loaded); // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           return checkDecayAndSwapLFU(counterOffset, collisions, key, loaded, mapper);
         }
         final Map.Entry<K, V> entry = Map.entry(key, mapper.apply(key, loaded));
@@ -69,7 +81,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {
     int index = 0;
     synchronized (collisions) {
@@ -106,7 +118,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   @SuppressWarnings("unchecked")
-  private V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final Map.Entry<K, V> entry) {
     int index = 0;
     synchronized (collisions) {
@@ -152,7 +164,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    */
   @SuppressWarnings("unchecked")
   private void decayAndSwapLFU(final int counterOffset, final int maxCounterIndex,
-      final Object[] collisions, final Map.Entry<K, V> entry) {
+      final Map.Entry<K, V>[] collisions, final Map.Entry<K, V> entry) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
@@ -218,15 +230,22 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       Map.Entry<K, V> collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
       if (collision == null) {
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return val; // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           break;
         }
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         collision = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (collision == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           size.getAndIncrement();
@@ -242,8 +261,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         return val;
       }
       if (key.equals(collision.getKey())) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, collision, newEntry);
         if (witness == collision) {
           return val;
         }
@@ -261,8 +283,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           if (index > 0) { // Always allow entry at index 0, regardless of capacity.
             break;
           }
+          if (newEntry == null) {
+            newEntry = Map.entry(key, val);
+          }
           collision = (Map.Entry<K, V>) OA
-              .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+              .compareAndExchangeRelease(collisions, index, null, newEntry);
           if (collision == null) {
             BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -278,8 +303,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return val;
         }
         if (key.equals(collision.getKey())) {
+          if (newEntry == null) {
+            newEntry = Map.entry(key, val);
+          }
           final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-              .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+              .compareAndExchangeRelease(collisions, index, collision, newEntry);
           if (witness == collision) {
             return val;
           }
@@ -289,8 +317,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
         }
       } while (++index < collisions.length);
+      if (newEntry == null) {
+        newEntry = Map.entry(key, val);
+      }
       final int counterOffset = hash << maxCollisionsShift;
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, Map.entry(key, val));
+      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, newEntry);
     }
     return val;
   }
@@ -304,15 +335,22 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       final Map.Entry<K, V> collision = collisions[index];
       if (collision == null) {
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return val; // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           break;
         }
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (witness == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           size.getAndIncrement();
@@ -335,8 +373,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           if (index > 0) { // Always allow entry at index 0, regardless of capacity.
             break;
           }
+          if (newEntry == null) {
+            newEntry = Map.entry(key, val);
+          }
           collision = (Map.Entry<K, V>) OA
-              .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+              .compareAndExchangeRelease(collisions, index, null, newEntry);
           if (collision == null) {
             BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -347,8 +388,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.getValue();
         }
       } while (++index < collisions.length);
+      if (newEntry == null) {
+        newEntry = Map.entry(key, val);
+      }
       final int counterOffset = hash << maxCollisionsShift;
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, Map.entry(key, val));
+      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, newEntry);
     }
     return val;
   }
@@ -362,14 +406,18 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       final Map.Entry<K, V> collision = collisions[index];
       if (collision == null) {
         if (size.get() > capacity) {
           return null;
         }
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (witness == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           size.getAndIncrement();
@@ -396,14 +444,18 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int hash = hashCoder.applyAsInt(key) & mask;
     final Map.Entry<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
+    Map.Entry<K, V> newEntry = null;
     do {
       Map.Entry<K, V> collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
       if (collision == null) {
         if (size.get() > capacity) {
           return null;
         }
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         collision = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, null, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, null, newEntry);
         if (collision == null) {
           BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
           size.getAndIncrement();
@@ -419,8 +471,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         return val;
       }
       if (key.equals(collision.getKey())) {
+        if (newEntry == null) {
+          newEntry = Map.entry(key, val);
+        }
         final Map.Entry<K, V> witness = (Map.Entry<K, V>) OA
-            .compareAndExchangeRelease(collisions, index, collision, Map.entry(key, val));
+            .compareAndExchangeRelease(collisions, index, collision, newEntry);
         if (witness == collision) {
           return val;
         }
@@ -436,6 +491,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   @Override
   public String toString() {
     return "SparseEntryCollisionCache{capacity=" + capacity
+        + ", strictCapacity=" + strict
         + ", size=" + size.get()
         + ", " + super.toString() + '}';
   }

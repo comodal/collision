@@ -15,15 +15,25 @@ import java.util.function.ToIntFunction;
 final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
 
   private final int capacity;
+  private final boolean strict;
   private final AtomicInteger size;
 
-  SparseCollisionCache(final int capacity, final Class<V> valueType, final int maxCollisionsShift,
-      final byte[] counters, final int initCount, final int pow2LogFactor, final V[][] hashTable,
-      final ToIntFunction<K> hashCoder, final BiPredicate<K, Object> isValForKey,
-      final Function<K, L> loader, final BiFunction<K, L, V> finalizer) {
+  SparseCollisionCache(
+      final int capacity, final boolean strictCapacity,
+      final Class<V> valueType,
+      final int maxCollisionsShift,
+      final byte[] counters,
+      final int initCount,
+      final int pow2LogFactor,
+      final V[][] hashTable,
+      final ToIntFunction<K> hashCoder,
+      final BiPredicate<K, Object> isValForKey,
+      final Function<K, L> loader,
+      final BiFunction<K, L, V> finalizer) {
     super(valueType, maxCollisionsShift, counters, initCount, pow2LogFactor, hashTable, hashCoder,
         isValForKey, loader, finalizer);
     this.capacity = capacity;
+    this.strict = strictCapacity;
     this.size = new AtomicInteger();
   }
 
@@ -44,8 +54,11 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
         if (loaded == null) {
           return null;
         }
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return mapper.apply(key, loaded); // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           return checkDecayAndSwapLFU(counterOffset, collisions, key, loaded, mapper);
         }
         final V val = mapper.apply(key, loaded);
@@ -74,7 +87,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   }
 
   @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private <I> V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {
     int index = 0;
     synchronized (collisions) {
@@ -116,7 +129,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   }
 
   @SuppressWarnings("unchecked")
-  private V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
       final K key, final V val) {
     int index = 0;
     synchronized (collisions) {
@@ -160,7 +173,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
    * @param val             The value to put in place of the least frequently used value.
    */
   private void decayAndSwapLFU(final int counterOffset, final int maxCounterIndex,
-      final Object[] collisions, final Object val) {
+      final V[] collisions, final Object val) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
@@ -231,8 +244,11 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     do {
       Object collision = OA.getVolatile(collisions, index);
       if (collision == null) {
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return val; // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           break;
         }
         collision = OA.compareAndExchangeRelease(collisions, index, null, val);
@@ -316,8 +332,11 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     do {
       final V collision = collisions[index];
       if (collision == null) {
-        // Always allow entry at index 0, regardless of capacity.
-        if (index > 0 && size.get() > capacity) {
+        if (index == 0) { // Nothing to swap with and over capacity.
+          if (strict && size.get() > capacity) {
+            return val; // TODO Async or parallel scan for 0 counts to expire?
+          } // If not strict, allows allow first entry into first collision index.
+        } else if (size.get() > capacity) {
           break;
         }
         final Object witness = OA.compareAndExchangeRelease(collisions, index, null, val);
@@ -446,6 +465,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   @Override
   public String toString() {
     return "SparseCollisionCache{capacity=" + capacity
+        + ", strictCapacity=" + strict
         + ", size=" + size.get()
         + ", " + super.toString() + '}';
   }

@@ -152,6 +152,11 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
   }
 
   @Override
+  public void nullBuckets() {
+    IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);
+  }
+
+  @Override
   public String toString() {
     return "maxCollisions=" + (1 << maxCollisionsShift)
         + ", numCounters=" + counters.length

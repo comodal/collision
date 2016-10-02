@@ -63,7 +63,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   }
 
   @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private <I> V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {
     int index = 0;
     synchronized (collisions) {
@@ -84,7 +84,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   }
 
   @SuppressWarnings("unchecked")
-  private V checkDecayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
       final K key, final V val) {
     int index = 0;
     synchronized (collisions) {
@@ -108,7 +108,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
    * @param collisions    values sitting in a hash bucket.
    * @param val           The value to put in place of the least frequently used value.
    */
-  private void decayAndSwapLFU(final int counterOffset, final Object[] collisions,
+  private void decayAndSwapLFU(final int counterOffset, final V[] collisions,
       final Object val) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
