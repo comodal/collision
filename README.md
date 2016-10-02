@@ -30,6 +30,12 @@ CollisionCache<Key, Value> cache = CollisionCache
 * VM options: -server -Xmx2G -XX:+UseG1GC -XX:-UseBiasedLocking
 * JMH 1.12
 
+```java
+CollisionCache.<V>withCapacity(maximumSize)
+    .setStrictCapacity(true)
+    .buildSparse(3.0);
+```
+
 ![caffeine-get-put-benchmark.png](benchmark/caffeine-get-put-benchmark.png)
 
 ###Implementation Notes & Cache Types
