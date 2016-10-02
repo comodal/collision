@@ -40,7 +40,7 @@ CollisionCache<Key, Value> cache = CollisionCache
 ####Packed Caches
 The number of elements is not explicitly tracked, instead it is limited organically by the number of slots available in the backing hash table.  This might be useful for rare use cases where you can probably fit everything into cache, but it could possibly overflow and need some convenient mechanism to swap out elements.
 
-The number of slots in the hash table is the next power of two greater than `capacity - 1`, e.g., if capacity is 1024, then the number of slots is 1048 and if capacity is 800 then the number of slots is 1048.  The extra space over capacity is given because it is unlikely every slot will be populated.
+The number of slots in the hash table is the next power of two greater than `capacity - 1`, e.g., if capacity is 1024, then the number of slots is 1024 and if capacity is 800 then the number of slots is 1024.  The extra space over capacity is given because it is unlikely every slot will be populated.
 
 ####Sparse Caches
 The number of elements is explicitly tracked and can be strictly limited to `capacity` or allowed to temporarily go over `capacity` and organically decay back down as buckets with multiple entries are accessed.
