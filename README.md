@@ -1,4 +1,4 @@
-##Collision [![Build Status](https://travis-ci.org/jamespedwards42/collision.svg?branch=master)](https://travis-ci.org/jamespedwards42/collision) [![bintray](https://img.shields.io/bintray/v/jamespedwards42/libs/collision.svg)](https://bintray.com/jamespedwards42/libs/collision/_latestVersion) [![license](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://raw.githubusercontent.com/collision/jedipus/master/LICENSE)
+##Collision [![Build Status](https://travis-ci.org/jamespedwards42/collision.svg?branch=master)](https://travis-ci.org/jamespedwards42/collision) [ ![Download](https://api.bintray.com/packages/jamespedwards42/libs/collision/images/download.svg) ](https://bintray.com/jamespedwards42/libs/collision/_latestVersion) [![license](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://raw.githubusercontent.com/collision/jedipus/master/LICENSE)
 
 > Java 9 Fixed Capacity Loading Cache
 
@@ -29,7 +29,7 @@ These benchmarks are intended to mimic those found in the [Caffeine Cache](https
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
 * VM: JDK 9-ea+138 / options: -server
 
-####[Loading Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/LoadingBenchmark.java)
+####[Loading Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/LoadingBenchmark.java#L56)
 
 Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
 
@@ -53,7 +53,7 @@ CollisionCache
 
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
 
-####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java)
+####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java#L50)
 
 Tests get and put operations against a cache pre-populated with a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution.
 
