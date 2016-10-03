@@ -23,7 +23,7 @@ CollisionCache<Key, Value> cache = CollisionCache
 
 ###Benchmarks
 
-These benchmarks are intended to mimic those found in the [Caffeine Cache](https://github.com/ben-manes/caffeine/wiki/Benchmarks) project.
+These benchmarks are intended to mimic those found in the [Caffeine Cache](https://github.com/ben-manes/caffeine/wiki/Benchmarks) project.  [JMH](http://openjdk.java.net/projects/code-tools/jmh/) was used to run the benchmarks.
 
 ######Environment:
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
@@ -49,9 +49,9 @@ CollisionCache
     .buildSparse(3.0);
 ```
 
-> JMH 1.15, 20 threads, 10 warm-up & 20 measurement iterations.
-
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
+
+> JMH 1.15, 20 threads, 10 warm-up & 20 measurement iterations.
 
 ####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java#L50)
 
@@ -64,13 +64,13 @@ CollisionCache
   .buildSparse(3.0);
 ```
 
-> JMH 1.15, 16 threads, 10 warm-up & 20 measurement iterations.
-
 ![read-only-and-write-only-throughput](benchmark/read-only-and-write-only-throughput.png)
 
-> JMH 1.15, 12 read & 4 write threads, 10 warm-up & 20 measurement iterations.
+> JMH 1.15, 16 threads, 10 warm-up & 20 measurement iterations.
 
 ![read-write-throughput](benchmark/read-write-throughput.png)
+
+> JMH 1.15, 12 read & 4 write threads, 10 warm-up & 20 measurement iterations.
 
 
 ###Implementation Notes & Cache Types
