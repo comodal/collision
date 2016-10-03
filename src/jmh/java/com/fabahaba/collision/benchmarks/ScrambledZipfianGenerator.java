@@ -1,4 +1,4 @@
-package com.fabahaba.collission.cache;
+package com.fabahaba.collision.benchmarks;
 
 final class ScrambledZipfianGenerator {
 

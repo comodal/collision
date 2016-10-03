@@ -13,16 +13,16 @@ CollisionCache<Key, Value> cache = CollisionCache
 ```
 
 ###Design Features
-* Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `isValForKey(K key, V val)`, then keys will not be stored.
+* Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `boolean isValForKey(K key, V val)`, then keys will not be stored.
   * For use cases with large keys relative to the size of values, using that space to store more values may dramatically improve performance.
-* Two phase loading to separate loading of raw data and deserialization/parsing of data.  Helps to prevent unnecessary processing.
+* Two-phase loading to separate loading of raw data and deserialization/parsing of data.  Helps to prevent unnecessary processing.
 * Uses CAS atomic operations as much as possible to optimize for concurrent access.
 * Optional user supplied `int hashCode(K key)` function.
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
 * Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/LogCounterCache.java#L29) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
 
 ####Benchmarks
-####Caffeine Get Put Benchmark
+#####[Caffeine Get Put Benchmark](https://github.com/ben-manes/caffeine/wiki/Benchmarks)
 
 ######Environment:
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
@@ -53,9 +53,9 @@ The number of elements is explicitly tracked and can be strictly limited to `cap
 
 The number of slots in the hash table is the next power of two greater than `(sparseFactor * capacity) - 1`.
 
-By default the hash table, a two dimensional array, is completely initialized.  If using a large `sparseFactor` consider setting `lazyInitBuckets` to true to save space.
+The hash table, a two dimensional array, is completely initialized by default.  If using a large `sparseFactor` consider setting `lazyInitBuckets` to true to save space.
 
-If not strictly limiting the capacity the number of entries can exceed capacity by:
+If not strictly limiting the capacity, the number of entries can exceed capacity by:
 ```
 (nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)
 ```

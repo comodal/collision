@@ -174,7 +174,7 @@ public final class CollisionBuilder<V> {
     return strictCapacity;
   }
 
-  public CollisionBuilder setStrictCapacity(final boolean strictCapacity) {
+  public CollisionBuilder<V> setStrictCapacity(final boolean strictCapacity) {
     this.strictCapacity = strictCapacity;
     return this;
   }

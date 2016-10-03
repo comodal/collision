@@ -1,4 +1,4 @@
-package com.fabahaba.collission.cache;
+package com.fabahaba.collision.benchmarks;
 
 final class ZipfianGenerator {
 
@@ -9,7 +9,6 @@ final class ZipfianGenerator {
   private final double zetan;
   private final double eta;
   private final double theta;
-  private final double zetaToTheta;
 
   ZipfianGenerator(final long max, final double zipfianConstant) {
     this(max, zipfianConstant, zetastatic(max + 1, zipfianConstant));
@@ -19,14 +18,14 @@ final class ZipfianGenerator {
       final double zetan) {
     this.items = max + 1;
     this.theta = zipfianConstant;
-    this.zetaToTheta = zetastatic(2, theta);
+    final double zetaToTheta = zetastatic(2, theta);
     this.alpha = 1.0 / (1.0 - theta);
     this.zetan = zetan;
     this.eta = (1 - Math.pow(2.0 / items, 1 - theta)) / (1 - zetaToTheta / zetan);
     nextValue();
   }
 
-  static double zetastatic(final long max, final double theta) {
+  private static double zetastatic(final long max, final double theta) {
     double sum = 0.0;
     for (long i = 0;i < max;) {
       sum += 1 / Math.pow(++i, theta);
