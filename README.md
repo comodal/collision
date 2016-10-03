@@ -21,7 +21,7 @@ CollisionCache<Key, Value> cache = CollisionCache
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
 * Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/LogCounterCache.java#L29) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
 
-####Benchmarks
+###Benchmarks
 
 These benchmarks are intended to mimic those found in the [Caffeine Cache](https://github.com/ben-manes/caffeine/wiki/Benchmarks) project.
 
@@ -29,7 +29,7 @@ These benchmarks are intended to mimic those found in the [Caffeine Cache](https
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
 * VM: JDK 9-ea+138 / options: -server
 
-#####[Loading Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/LoadingBenchmark.java)
+####[Loading Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/LoadingBenchmark.java)
 
 Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
 
@@ -53,7 +53,7 @@ CollisionCache
 
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
 
-#####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java)
+####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java)
 
 Tests get and put operations against a cache pre-populated with a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution.
 
