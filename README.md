@@ -49,7 +49,7 @@ CollisionCache
     .buildSparse(3.0);
 ```
 
-> JMH 1.15, 20 threads
+> JMH 1.15, 20 threads, 10 warm-up & 20 measurement iterations.
 
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
 
@@ -64,11 +64,11 @@ CollisionCache
   .buildSparse(3.0);
 ```
 
-> JMH 1.15, 16 threads
+> JMH 1.15, 16 threads, 10 warm-up & 20 measurement iterations.
 
 ![read-only-and-write-only-throughput](benchmark/read-only-and-write-only-throughput.png)
 
-> JMH 1.15, 12 read threads & 4 write threads
+> JMH 1.15, 12 read & 4 write threads, 10 warm-up & 20 measurement iterations.
 
 ![read-write-throughput](benchmark/read-write-throughput.png)
 
