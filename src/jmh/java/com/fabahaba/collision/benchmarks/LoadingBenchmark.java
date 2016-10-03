@@ -43,6 +43,7 @@ public class LoadingBenchmark {
 
   @State(Scope.Thread)
   public static class ThreadState {
+
     int index = ThreadLocalRandom.current().nextInt();
   }
 
@@ -59,8 +60,8 @@ public class LoadingBenchmark {
       this.keys[i] = generator.nextValue();
     }
     this.benchmarkFunction = cacheType.create();
-    for (final Long i : keys) {
-      if (!i.equals(benchmarkFunction.apply(i))) {
+    for (final Long key : keys) {
+      if (!key.equals(benchmarkFunction.apply(key))) {
         throw new IllegalStateException(cacheType + " returned invalid value.");
       }
     }
