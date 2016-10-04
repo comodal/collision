@@ -4,12 +4,12 @@
 
 ```java
 CollisionCache<Key, Value> cache = CollisionCache
-    .<Value>withCapacity(1_048_576)
-    .<Key, byte[]>setLoader(
-        guid -> loadFromDisk(guid), 
-        (guid, loaded) -> deserialize(loaded))
-    .setIsValForKey((guid, val) -> ((Value) val).getGUID().equals(guid))
-    .buildSparse();
+  .<Value>withCapacity(1_048_576)
+  .<Key, byte[]>setLoader(
+    guid -> loadFromDisk(guid), 
+    (guid, loaded) -> deserialize(loaded))
+  .setIsValForKey((guid, val) -> ((Value) val).getGUID().equals(guid))
+  .buildSparse();
 ```
 
 ###Design Features
@@ -45,8 +45,8 @@ CollisionCache
       Math.pow(num, 3); // Something else to punish the miss.
       return num;
     })
-    .setStoreKeys(false) // Also ran with key storage (true).
-    .buildSparse(3.0);
+  .setStoreKeys(false) // Also ran with key storage (true).
+  .buildSparse(3.0);
 ```
 
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
@@ -95,3 +95,6 @@ If not strictly limiting the capacity, the number of entries can exceed capacity
 (nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)
 ```
 For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.
+
+###Contribute
+Pull requests for benchmarks and tests are welcome. Feel free to open an issue for feature requests, ideas, or issues.

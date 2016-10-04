@@ -17,14 +17,15 @@ import java.util.stream.IntStream;
 abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
     implements LoadingCollisionCache<K, L, V> {
 
-  final Class<V> valueType;
+  private final Class<V> valueType;
   final int maxCollisionsShift;
-  final V[][] hashTable;
+  private final V[][] hashTable;
   final int mask;
   final ToIntFunction<K> hashCoder;
   final BiPredicate<K, Object> isValForKey;
   private final Function<K, L> loader;
   private final BiFunction<K, L, V> mapper;
+  private final Function<K, V> loadAndMap;
 
   BaseCollisionCache(final Class<V> valueType,
       final int maxCollisionsShift,
@@ -45,6 +46,10 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
     this.isValForKey = isValForKey;
     this.loader = loader;
     this.mapper = mapper;
+    this.loadAndMap = key -> {
+      final L loaded = loader.apply(key);
+      return loaded == null ? null : mapper.apply(key, loaded);
+    };
   }
 
   /**
@@ -79,6 +84,41 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
   public V get(final K key, final Function<K, L> loader) {
     return get(key, loader, mapper);
   }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public V getLoadAtomic(final K key) {
+    return getLoadAtomic(key, loadAndMap);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public V getLoadAtomic(final K key, final Function<K, V> loadAndMap) {
+    final int hash = hashCoder.applyAsInt(key) & mask;
+    final V[] collisions = getCreateCollisions(hash);
+    final int counterOffset = hash << maxCollisionsShift;
+    for (int index = 0;;) {
+      final V collision = collisions[index];
+      if (collision == null) {
+        return checkDecayAndSwapLFU(counterOffset, collisions, key, loadAndMap);
+      }
+      if (isValForKey.test(key, collision)) {
+        atomicIncrement(counterOffset + index);
+        return collision;
+      }
+      if (++index == collisions.length) {
+        return checkDecayAndSwapLFU(counterOffset, collisions, key, loadAndMap);
+      }
+    }
+  }
+
+  protected abstract V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
+      final K key, final Function<K, V> loadAndMap);
 
   /**
    * {@inheritDoc}

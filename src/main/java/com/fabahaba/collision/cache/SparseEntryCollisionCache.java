@@ -81,6 +81,67 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   @SuppressWarnings("unchecked")
+  protected V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
+      final K key, final Function<K, V> loadAndMap) {
+    int index = 0;
+    V val;
+    Map.Entry<K, V> collision;
+    synchronized (collisions) {
+      NO_SWAP:
+      for (;;) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
+        collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
+        if (collision == null) {
+          val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          if (index == 0) { // Nothing to swap with and over capacity.
+            if (strict && size.get() > capacity) {
+              return val; // TODO Async or parallel scan for 0 counts to expire?
+            } // If not strict, allows allow first entry into first collision index.
+          } else if (size.get() > capacity) {
+            decayAndSwapLFU(counterOffset, counterOffset + index, collisions, Map.entry(key, val));
+            return val;
+          }
+          final Map.Entry<K, V> entry = Map.entry(key, val);
+          do {
+            collision = (Map.Entry<K, V>) OA
+                .compareAndExchangeRelease(collisions, index, null, entry);
+            if (collision == null) {
+              break NO_SWAP;
+            }
+            if (key.equals(collision.getKey())) {
+              val = collision.getValue();
+              break NO_SWAP;
+            }
+          } while (++index < collisions.length && size.get() <= capacity);
+          decayAndSwapLFU(counterOffset, counterOffset + index, collisions, entry);
+          return val;
+        }
+        if (key.equals(collision.getKey())) {
+          val = collision.getValue();
+          break;
+        }
+        if (++index == collisions.length) {
+          val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          decayAndSwapLFU(counterOffset, counterOffset + index, collisions, Map.entry(key, val));
+          return val;
+        }
+      }
+    }
+    if (collision == null) {
+      BA.setRelease(counters, counterOffset + index, initCount);
+      size.getAndIncrement();
+      return val;
+    }
+    atomicIncrement(counterOffset + index);
+    return val;
+  }
+
+  @SuppressWarnings("unchecked")
   private <I> V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {
     int index = 0;

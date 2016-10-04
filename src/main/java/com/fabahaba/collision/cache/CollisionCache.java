@@ -38,6 +38,10 @@ public interface CollisionCache<K, V> {
    */
   <I> V get(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper);
 
+  V getLoadAtomic(final K key);
+
+  V getLoadAtomic(final K key, final Function<K, V> loadAndMap);
+
   /**
    * @param key used for table hash and value equality.
    * @param val The value to put.  In race conditions occurring after entry to this call, another

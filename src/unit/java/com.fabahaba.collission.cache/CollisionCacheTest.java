@@ -30,6 +30,14 @@ public class CollisionCacheTest {
     return new BigInteger(1, hashBytes).toString(16);
   }
 
+  private static String[] expectedHashes = new String[32];
+
+  static {
+    for (int i = 0;i < expectedHashes.length;i++) {
+      expectedHashes[i] = hashInteger(i);
+    }
+  }
+
   @Test
   public void testPackedNoKeyCache() {
     final int maxCollisions = 8;
@@ -102,13 +110,20 @@ public class CollisionCacheTest {
             key -> hashInteger(key),
             (key, hash) -> hash)
         .buildPacked();
-    for (int i = 0;i < 10;i++) {
-      final String expected = hashInteger(i);
+    for (int i = 0;i < expectedHashes.length;i++) {
+      final String expected = expectedHashes[i];
       assertEquals(expected, cache.get(i));
       assertEquals(expected, cache.getIfPresent(i));
       assertEquals(expected, cache.getIfPresentVolatile(i));
     }
     cache.clear();
+    for (int i = 0;i < expectedHashes.length;i++) {
+      final String expected = expectedHashes[i];
+      assertEquals(expected, cache.getLoadAtomic(i));
+      assertEquals(expected, cache.getIfPresent(i));
+      assertEquals(expected, cache.getIfPresentVolatile(i));
+    }
+    cache.nullBuckets();
     assertNull(cache.getIfPresent(1));
   }
 
@@ -120,13 +135,20 @@ public class CollisionCacheTest {
             key -> hashInteger(key),
             (key, hash) -> hash)
         .buildSparse();
-    for (int i = 0;i < 10;i++) {
-      final String expected = hashInteger(i);
+    for (int i = 0;i < expectedHashes.length;i++) {
+      final String expected = expectedHashes[i];
       assertEquals(expected, cache.get(i));
       assertEquals(expected, cache.getIfPresent(i));
       assertEquals(expected, cache.getIfPresentVolatile(i));
     }
     cache.clear();
+    for (int i = 0;i < expectedHashes.length;i++) {
+      final String expected = expectedHashes[i];
+      assertEquals(expected, cache.getLoadAtomic(i));
+      assertEquals(expected, cache.getIfPresent(i));
+      assertEquals(expected, cache.getIfPresentVolatile(i));
+    }
+    cache.nullBuckets();
     assertNull(cache.getIfPresent(1));
   }
 }

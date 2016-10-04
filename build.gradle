@@ -1,8 +1,6 @@
 buildscript { repositories { jcenter() } }
 plugins {
   id 'java'
-  id 'eclipse'
-  id 'idea'
   id 'pl.allegro.tech.build.axion-release' version '1.4.0'
   id 'maven-publish'
   id 'com.jfrog.bintray' version '1.7.1'
@@ -63,6 +61,8 @@ jmh {
   failOnError = true
   forceGC = true
   fork = 1
+  // [cl, comp, gc, stack, perf, perfnorm, perfasm, xperf, xperfasm, hs_cl, hs_comp, hs_gc, hs_rt, hs_thr]
+   profilers = []
 }
 
 test {

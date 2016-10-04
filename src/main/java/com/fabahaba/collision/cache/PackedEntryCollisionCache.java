@@ -57,6 +57,62 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         : checkDecayAndSwapLFU(counterOffset, collisions, key, loaded, mapper);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  protected V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
+      final K key, final Function<K, V> loadAndMap) {
+    int index = 0;
+    V val;
+    Map.Entry<K, V> collision;
+    synchronized (collisions) {
+      NO_SWAP:
+      for (;;) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
+        collision = (Map.Entry<K, V>) OA.getVolatile(collisions, index);
+        if (collision == null) {
+          val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          final Map.Entry<K, V> entry = Map.entry(key, val);
+          do {
+            collision = (Map.Entry<K, V>) OA
+                .compareAndExchangeRelease(collisions, index, null, entry);
+            if (collision == null) {
+              break NO_SWAP;
+            }
+            if (key.equals(collision.getKey())) {
+              val = collision.getValue();
+              break NO_SWAP;
+            }
+          } while (++index < collisions.length);
+          decayAndSwapLFU(counterOffset, collisions, entry);
+          return val;
+        }
+        if (key.equals(collision.getKey())) {
+          val = collision.getValue();
+          break;
+        }
+        if (++index == collisions.length) {
+          val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          decayAndSwapLFU(counterOffset, collisions, Map.entry(key, val));
+          return val;
+        }
+      }
+    }
+    if (collision == null) {
+      BA.setRelease(counters, counterOffset + index, initCount);
+      return val;
+    }
+    atomicIncrement(counterOffset + index);
+    return val;
+  }
+
   @SuppressWarnings("unchecked")
   private <I> V checkDecayAndSwapLFU(final int counterOffset, final Map.Entry<K, V>[] collisions,
       final K key, final I loaded, final BiFunction<K, I, V> mapper) {

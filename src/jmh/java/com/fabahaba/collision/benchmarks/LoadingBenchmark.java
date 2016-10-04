@@ -34,8 +34,9 @@ public class LoadingBenchmark {
   @Param({
              "Cache2k",
              "Caffeine",
-             "Collision_No_Keys",
-             "Collision_With_Keys"
+             //"Collision_No_Keys",
+             "Collision_With_Keys",
+             "Collision_With_Keys_Atomic"
          })
   BenchmarkFunctionFactory cacheType;
   private Function<Long, Long> benchmarkFunction;
@@ -136,6 +137,14 @@ public class LoadingBenchmark {
         final CollisionCache<Long, Long> cache = startCollision()
             .buildSparse(3.0);
         return cache::get;
+      }
+    },
+    Collision_With_Keys_Atomic {
+      @Override
+      Function<Long, Long> create() {
+        final CollisionCache<Long, Long> cache = startCollision()
+            .buildSparse(3.0);
+        return cache::getLoadAtomic;
       }
     };
 
