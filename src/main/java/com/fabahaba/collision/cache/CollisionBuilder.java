@@ -1,7 +1,6 @@
 package com.fabahaba.collision.cache;
 
 import java.lang.reflect.Array;
-import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -48,7 +47,7 @@ public final class CollisionBuilder<V> {
   <K, L> LoadingCollisionCache<K, L, V> buildSparse(
       final double sparseFactor,
       final ToIntFunction<K> hashCoder,
-      final BiPredicate<K, Object> isValForKey,
+      final BiPredicate<K, V> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
     final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_SPARSE_BUCKET_SIZE;
@@ -59,7 +58,7 @@ public final class CollisionBuilder<V> {
     final int pow2LogFactor = LogCounterCache.calcLogFactorShift(maxCounterVal);
     final int hashTableLength = counters.length >> maxCollisionsShift;
     if (isStoreKeys()) {
-      final Map.Entry<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
+      final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
       return new SparseEntryCollisionCache<>(
           capacity,
           strictCapacity,
@@ -93,7 +92,7 @@ public final class CollisionBuilder<V> {
 
   <K, L> LoadingCollisionCache<K, L, V> buildPacked(
       final ToIntFunction<K> hashCoder,
-      final BiPredicate<K, Object> isValForKey,
+      final BiPredicate<K, V> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
     final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_PACKED_BUCKET_SIZE;
@@ -103,7 +102,7 @@ public final class CollisionBuilder<V> {
     final int pow2LogFactor = LogCounterCache.calcLogFactorShift(maxCounterVal);
     final int hashTableLength = counters.length >> maxCollisionsShift;
     if (isStoreKeys()) {
-      final Map.Entry<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
+      final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
       return new PackedEntryCollisionCache<>(
           maxCollisionsShift,
           counters,
@@ -124,16 +123,16 @@ public final class CollisionBuilder<V> {
   }
 
   @SuppressWarnings("unchecked")
-  private <K, V> Map.Entry<K, V>[][] createEntryHashTable(
+  private <K, V> KeyVal<K, V>[][] createEntryHashTable(
       final int hashTableLength,
       final int maxCollisions) {
     if (lazyInitBuckets) {
       final Class<?> valueArrayType = Array
-          .newInstance(Map.Entry.class, 0).getClass();
-      return (Map.Entry<K, V>[][]) Array.newInstance(valueArrayType, hashTableLength);
+          .newInstance(KeyVal.class, 0).getClass();
+      return (KeyVal<K, V>[][]) Array.newInstance(valueArrayType, hashTableLength);
     }
-    return (Map.Entry<K, V>[][]) Array
-        .newInstance(Map.Entry.class, hashTableLength, maxCollisions);
+    return (KeyVal<K, V>[][]) Array
+        .newInstance(KeyVal.class, hashTableLength, maxCollisions);
   }
 
   @SuppressWarnings("unchecked")
@@ -153,7 +152,7 @@ public final class CollisionBuilder<V> {
     return new KeyedCollisionBuilder<>(this, hashCoder);
   }
 
-  public <K> KeyedCollisionBuilder<K, V> setIsValForKey(final BiPredicate<K, Object> isValForKey) {
+  public <K> KeyedCollisionBuilder<K, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
     return new KeyedCollisionBuilder<>(this, isValForKey);
   }
 

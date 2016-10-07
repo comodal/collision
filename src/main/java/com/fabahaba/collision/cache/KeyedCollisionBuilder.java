@@ -11,14 +11,14 @@ public final class KeyedCollisionBuilder<K, V> {
 
   private final CollisionBuilder<V> delegate;
   private ToIntFunction<K> hashCoder;
-  private BiPredicate<K, Object> isValForKey;
+  private BiPredicate<K, V> isValForKey;
 
   KeyedCollisionBuilder(final CollisionBuilder<V> delegate, final ToIntFunction<K> hashCoder) {
     this(delegate, hashCoder, null);
   }
 
   KeyedCollisionBuilder(final CollisionBuilder<V> delegate,
-      final BiPredicate<K, Object> isValForKey) {
+      final BiPredicate<K, V> isValForKey) {
     this(delegate, null, isValForKey);
   }
 
@@ -27,16 +27,16 @@ public final class KeyedCollisionBuilder<K, V> {
   }
 
   KeyedCollisionBuilder(final CollisionBuilder<V> delegate, final ToIntFunction<K> hashCoder,
-      final BiPredicate<K, Object> isValForKey) {
+      final BiPredicate<K, V> isValForKey) {
     this.delegate = delegate;
     this.hashCoder = hashCoder;
     this.isValForKey = isValForKey;
   }
 
-  static final class DefaultIsValForKey<K> implements BiPredicate<K, Object> {
+  static final class DefaultIsValForKey<K, V> implements BiPredicate<K, V> {
 
     @Override
-    public boolean test(final K key, final Object val) {
+    public boolean test(final K key, final V val) {
       return val.equals(key);
     }
   }
@@ -106,11 +106,11 @@ public final class KeyedCollisionBuilder<K, V> {
     return this;
   }
 
-  public BiPredicate<K, Object> getIsValForKey() {
+  public BiPredicate<K, V> getIsValForKey() {
     return isValForKey == null ? new DefaultIsValForKey<>() : isValForKey;
   }
 
-  public KeyedCollisionBuilder<K, V> setIsValForKey(final BiPredicate<K, Object> isValForKey) {
+  public KeyedCollisionBuilder<K, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
     delegate.setStoreKeys(false);
     this.isValForKey = isValForKey;
     return this;

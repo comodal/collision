@@ -27,7 +27,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
       final int pow2LogFactor,
       final V[][] hashTable,
       final ToIntFunction<K> hashCoder,
-      final BiPredicate<K, Object> isValForKey,
+      final BiPredicate<K, V> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> finalizer) {
     super(valueType, maxCollisionsShift, counters, initCount, pow2LogFactor, hashTable, hashCoder,
@@ -48,33 +48,34 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     final int counterOffset = hash << maxCollisionsShift;
     int index = 0;
     do {
-      final V collision = collisions[index];
+      V collision = collisions[index];
       if (collision == null) {
         final I loaded = loader.apply(key);
         if (loaded == null) {
           return null;
         }
-        if (index == 0) { // Nothing to swap with and over capacity.
-          if (strict && size.get() > capacity) {
-            return mapper.apply(key, loaded); // TODO Async or parallel scan for 0 counts to expire?
-          } // If not strict, allows allow first entry into first collision index.
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) {  // Nothing to swap with and over capacity.
+            return mapper.apply(key, loaded);
+          }
         } else if (size.get() > capacity) {
-          return checkDecayAndSwapLFU(counterOffset, collisions, key, loaded, mapper);
+          return checkDecayAndProbSwap(counterOffset, collisions, key, loaded, mapper);
         }
         final V val = mapper.apply(key, loaded);
         do {
-          final Object witness = OA.compareAndExchangeRelease(collisions, index, null, val);
-          if (witness == null) {
+          collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+          if (collision == null) {
             BA.setRelease(counters, counterOffset + index, initCount);
             size.getAndIncrement();
             return val;
           }
-          if (isValForKey.test(key, witness)) {
+          if (isValForKey.test(key, collision)) {
             atomicIncrement(counterOffset + index);
-            return (V) witness;
+            return collision;
           }
         } while (++index < collisions.length && size.get() <= capacity);
-        return checkDecayAndSwapLFU(counterOffset, collisions, key, val);
+        return checkDecayAndProbSwap(counterOffset, collisions, key, val);
       }
       if (isValForKey.test(key, collision)) {
         atomicIncrement(counterOffset + index);
@@ -83,168 +84,280 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     } while (++index < collisions.length);
     final I loaded = loader.apply(key);
     return loaded == null ? null
-        : checkDecayAndSwapLFU(counterOffset, collisions, key, loaded, mapper);
-  }
-
-  @SuppressWarnings("unchecked")
-  protected V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions, final K key,
-      final Function<K, V> loadAndMap) {
-    int index = 0;
-    V val;
-    Object collision;
-    synchronized (collisions) {
-      NO_SWAP:
-      for (;;) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
-        collision = OA.getVolatile(collisions, index);
-        if (collision == null) {
-          val = loadAndMap.apply(key);
-          if (val == null) {
-            return null;
-          }
-          if (index == 0) { // Nothing to swap with and over capacity.
-            if (strict && size.get() > capacity) {
-              return val; // TODO Async or parallel scan for 0 counts to expire?
-            } // If not strict, allows allow first entry into first collision index.
-          } else if (size.get() > capacity) {
-            decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
-            return val;
-          }
-          do {
-            collision = OA.compareAndExchangeRelease(collisions, index, null, val);
-            if (collision == null) {
-              break NO_SWAP;
-            }
-            if (isValForKey.test(key, collision)) {
-              val = (V) collision;
-              break NO_SWAP;
-            }
-          } while (++index < collisions.length && size.get() <= capacity);
-          decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
-          return val;
-        }
-        if (isValForKey.test(key, collision)) {
-          val = (V) collision;
-          break;
-        }
-        if (++index == collisions.length) {
-          val = loadAndMap.apply(key);
-          if (val == null) {
-            return null;
-          }
-          decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
-          return val;
-        }
-      }
-    }
-    if (collision == null) {
-      BA.setRelease(counters, counterOffset + index, initCount);
-      size.getAndIncrement();
-      return val;
-    }
-    atomicIncrement(counterOffset + index);
-    return val;
-  }
-
-  @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
-      final K key, final I loaded, final BiFunction<K, I, V> mapper) {
-    int index = 0;
-    synchronized (collisions) {
-      do { // Double-check locked volatile before swapping LFU to help prevent duplicates.
-        Object collision = OA.getVolatile(collisions, index);
-        if (collision == null) {
-          if (index > 0) { // Always allow entry at index 0, regardless of capacity.
-            break;
-          }
-          final V val = mapper.apply(key, loaded);
-          if (val == null) {
-            return null;
-          }
-          collision = OA.compareAndExchangeRelease(collisions, index, null, val);
-          if (collision == null) {
-            BA.setRelease(counters, counterOffset + index, initCount);
-            size.getAndIncrement();
-            return val;
-          }
-          if (isValForKey.test(key, collision)) {
-            atomicIncrement(counterOffset + index);
-            return (V) collision;
-          }
-          // Don't cache, lost tie breaker.
-          return val;
-        }
-        if (isValForKey.test(key, collision)) {
-          atomicIncrement(counterOffset + index);
-          return (V) collision;
-        }
-      } while (++index < collisions.length);
-      final V val = mapper.apply(key, loaded);
-      if (val == null) {
-        return null;
-      }
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
-      return val;
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
-      final K key, final V val) {
-    int index = 0;
-    synchronized (collisions) {
-      do { // Double-check locked volatile before swapping LFU to help prevent duplicates.
-        Object collision = OA.getVolatile(collisions, index);
-        if (collision == null) {
-          if (index > 0) { // Always allow entry at index 0, regardless of capacity.
-            break;
-          }
-          collision = OA.compareAndExchangeRelease(collisions, index, null, val);
-          if (collision == null) {
-            BA.setRelease(counters, counterOffset + index, initCount);
-            size.getAndIncrement();
-            return val;
-          }
-          if (isValForKey.test(key, collision)) {
-            atomicIncrement(counterOffset + index);
-            return (V) collision;
-          }
-          // Don't cache, lost tie breaker.
-          return val;
-        }
-        if (isValForKey.test(key, collision)) {
-          atomicIncrement(counterOffset + index);
-          return (V) collision;
-        }
-      } while (++index < collisions.length);
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
-    }
-    return val;
+        : checkDecayAndProbSwap(counterOffset, collisions, key, loaded, mapper);
   }
 
   /**
-   * Divides all counters for values within a hash bucket (collisions), swaps the value for the
-   * least frequently used, and sets its counter to an initial value.  Also evicts the tail entry if
-   * its count is zero.
-   *
-   * @param counterOffset   beginning counter array index corresponding to collision values.
-   * @param maxCounterIndex Max counter index for known non null collision values.
-   * @param collisions      values sitting in a hash bucket.
-   * @param val             The value to put in place of the least frequently used value.
+   * This method assumes a full bucket or (XOR) over capacity and checks for both (AND).
    */
-  private void decayAndSwapLFU(final int counterOffset, final int maxCounterIndex,
-      final V[] collisions, final Object val) {
+  @SuppressWarnings("unchecked")
+  private <I> V checkDecayAndProbSwap(final int counterOffset, final V[] collisions, final K key,
+      final I loaded, final BiFunction<K, I, V> mapper) {
+    int index = 0;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    synchronized (collisions) {
+      for (;;++counterIndex) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) { // Assume over capacity.
+          final V val = mapper.apply(key, loaded);
+          if (index == 0) { // Strict capacity checked in parent call.
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterIndex, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              atomicIncrement(counterIndex);
+              return collision;
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
+        if (isValForKey.test(key, collision)) {
+          atomicIncrement(counterIndex);
+          return collision;
+        }
+
+        int count = ((int) counters[counterIndex]) & 0xff;
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+
+        if (++index == collisions.length) {
+          final V val = mapper.apply(key, loaded);
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            return val;
+          }
+          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          return val;
+        }
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private V checkDecayAndProbSwap(final int counterOffset, final V[] collisions, final K key,
+      final V val) {
+    int index = 0;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    synchronized (collisions) {
+      for (;;++counterIndex) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) { // Assume over capacity.
+          if (index == 0) { // Strict capacity checked in parent call.
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterIndex, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              atomicIncrement(counterIndex);
+              return collision;
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
+        if (isValForKey.test(key, collision)) {
+          atomicIncrement(counterIndex);
+          return collision;
+        }
+
+        int count = ((int) counters[counterIndex]) & 0xff;
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+
+        if (++index == collisions.length) {
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            return val;
+          }
+          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          return val;
+        }
+      }
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  V checkDecayAndSwap(final int counterOffset, final V[] collisions, final K key,
+      final Function<K, V> loadAndMap) {
+    if (size.get() > capacity) {
+      return checkDecayAndProbSwap(counterOffset, collisions, key, loadAndMap);
+    }
+    int index = 0;
+    synchronized (collisions) {
+      for (;;) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) {
+          final V val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          if (index == 0) {
+            // If not strict, allow first entry into first collision index.
+            if (strict && size.get() > capacity) {
+              // Nothing to swap with and over capacity.
+              return val;
+            }
+          } else if (size.get() > capacity) {
+            decaySwapAndDrop(counterOffset, counterOffset + index, collisions, val);
+            return val;
+          }
+          do {
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterOffset + index, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              atomicIncrement(counterOffset + index);
+              return collision;
+            }
+          } while (++index == collisions.length);
+          decayAndSwap(counterOffset, counterOffset + collisions.length, collisions, val);
+          return val;
+        }
+        if (isValForKey.test(key, collision)) {
+          atomicIncrement(counterOffset + index);
+          return collision;
+        }
+        if (++index == collisions.length) {
+          final V val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          if (size.get() > capacity) {
+            decaySwapAndDrop(counterOffset, counterOffset + collisions.length, collisions, val);
+            return val;
+          }
+          decayAndSwap(counterOffset, counterOffset + collisions.length, collisions, val);
+          return val;
+        }
+      }
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  V checkDecayAndProbSwap(final int counterOffset, final V[] collisions, final K key,
+      final Function<K, V> loadAndMap) {
+    int index = 0;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    synchronized (collisions) {
+      for (;;++counterIndex) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) {
+          final V val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          if (index == 0) {
+            // If not strict, allow first entry into first collision index.
+            if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+              return val;
+            }
+          } else if (size.get() > capacity) {
+            OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+            BA.setRelease(counters, minCounterIndex, initCount);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
+          do {
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterOffset + index, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              atomicIncrement(counterOffset + index);
+              return collision;
+            }
+          } while (++index == collisions.length);
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          decay(counterOffset, counterOffset + collisions.length, minCounterIndex);
+          return val;
+        }
+
+        if (isValForKey.test(key, collision)) {
+          atomicIncrement(counterIndex);
+          return collision;
+        }
+
+        int count = ((int) counters[counterIndex]) & 0xff;
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+
+        if (++index == collisions.length) {
+          final V val = loadAndMap.apply(key);
+          if (val == null) {
+            return null;
+          }
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            return val;
+          }
+          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          return val;
+        }
+      }
+    }
+  }
+
+
+  private void decaySwapAndDrop(final int counterOffset, final int maxCounterIndex,
+      final V[] collisions, final V val) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     do {
-      int count = ((int) BA.getVolatile(counters, counterIndex)) & 0xff;
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
       if (count == 0) {
         OA.setRelease(collisions, counterIndex - counterOffset, val);
         BA.setRelease(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) BA.getVolatile(counters, counterIndex)) & 0xff;
+          count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
           if (count > 0) {
-            BA.setRelease(counters, counterIndex, (byte) (count >>> 1));
+            BA.setRelease(counters, counterIndex, (byte) (count >> 2));
             continue;
           }
           size.getAndDecrement();
@@ -256,29 +369,24 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
             if (nextCollisionIndex == collisions.length) {
               return;
             }
-            final Object next = OA.getVolatile(collisions, nextCollisionIndex);
+            final Object next = OA.getAcquire(collisions, nextCollisionIndex);
+            if (next == null) {
+              return;
+            }
             // - Try to slide new data and its counter to the front.
             // - If a new collision concurrently sneaks in, break out.
-            // - Counter misses may occur during this transition.
-            if (next != null && OA.compareAndSet(collisions, collisionIndex, null, next)) {
-              if (counterIndex >= maxCounterIndex && next.equals(val)) {
-                // Handles the unlikely corner case of capacity becoming available and the same
-                // value slipping into one of the null spaces concurrently.  Set its count to zero
-                // so that it wll be swapped on the next collision.
-                BA.setRelease(counters, counterIndex++, (byte) 0);
-              } else {
-                count = ((int) BA.getVolatile(counters, counterIndex + 1)) & 0xff;
-                BA.setRelease(counters, counterIndex++, (byte) (count >>> 1));
-              }
-              continue;
+            if (OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+              return;
             }
-            return;
+            // - Counter misses may occur during this transition.
+            count = ((int) BA.getAcquire(counters, counterIndex + 1)) & 0xff;
+            BA.setRelease(counters, counterIndex++, (byte) (count >> 2));
           }
         }
         return;
       }
       // Counter misses may occur between these two calls.
-      BA.setRelease(counters, counterIndex, (byte) (count >>> 1));
+      BA.setRelease(counters, counterIndex, (byte) (count >> 2));
       if (count < minCount) {
         minCount = count;
         minCounterIndex = counterIndex;
@@ -295,85 +403,108 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   @SuppressWarnings("unchecked")
   public V putReplace(final K key, final V val) {
     if (val == null) {
-      throw new NullPointerException("Cannot cache a null value.");
+      throw new NullPointerException("Cannot cache a null val.");
     }
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      Object collision = OA.getVolatile(collisions, index);
+      V collision = (V) OA.getAcquire(collisions, index);
       if (collision == null) {
-        if (index == 0) { // Nothing to swap with and over capacity.
-          if (strict && size.get() > capacity) {
-            return val; // TODO Async or parallel scan for 0 counts to expire?
-          } // If not strict, allows allow first entry into first collision index.
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+            return val;
+          }
         } else if (size.get() > capacity) {
           break;
         }
-        collision = OA.compareAndExchangeRelease(collisions, index, null, val);
-        if (collision == null) {
-          BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
-          size.getAndIncrement();
-          return val;
-        }
-        // If another thread raced to PUT, let it win.
-        if (isValForKey.test(key, collision)) {
-          return (V) collision;
-        }
-        continue;
-      }
-      if (collision == val) {
-        return val;
-      }
-      if (isValForKey.test(key, collision)) {
-        final Object witness = OA.compareAndExchangeRelease(collisions, index, collision, val);
-        if (witness == collision) {
-          return val;
-        }
-        // If another thread raced to PUT, let it win.
-        if (isValForKey.test(key, witness)) {
-          return (V) witness;
-        }
-      }
-    } while (++index < collisions.length);
-    index = 0;
-    synchronized (collisions) {
-      do { // Double-check locked volatile before swapping LFU to prevent duplicates.
-        Object collision = OA.getVolatile(collisions, index);
-        if (collision == null) {
-          if (index > 0) { // Always allow entry at index 0, regardless of capacity.
-            break;
-          }
-          collision = OA.compareAndExchangeRelease(collisions, index, null, val);
+        do {
+          collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
           if (collision == null) {
             BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
             return val;
           }
-          // If another thread raced to PUT, let it win.
           if (isValForKey.test(key, collision)) {
-            return (V) collision;
+            return collision; // If another thread raced to PUT, let it win.
           }
-          continue;
+        } while (++index < collisions.length && size.get() <= capacity);
+        break;
+      }
+      if (collision == val) {
+        return val;
+      }
+      if (isValForKey.test(key, collision)) {
+        final V witness = (V) OA.compareAndExchangeRelease(collisions, index, collision, val);
+        if (witness == collision) {
+          return val;
         }
+        if (isValForKey.test(key, witness)) {
+          return witness; // If another thread raced to PUT, let it win.
+        }
+      }
+    } while (++index < collisions.length);
+
+    index = 0;
+    final int counterOffset = hash << maxCollisionsShift;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    synchronized (collisions) {
+      for (;;++counterIndex) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) {  // Assume over capacity.
+          if (index == 0) {  // Strict capacity checked above.
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterIndex, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              return collision; // If another thread raced to PUT, let it win.
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
         if (collision == val) {
           return val;
         }
+
         if (isValForKey.test(key, collision)) {
-          final Object witness = OA.compareAndExchangeRelease(collisions, index, collision, val);
+          final V witness = (V) OA.compareAndExchangeRelease(collisions, index, collision, val);
           if (witness == collision) {
             return val;
           }
-          // If another thread raced to PUT, let it win.
           if (isValForKey.test(key, witness)) {
-            return (V) witness;
+            return witness; // If another thread raced to PUT, let it win.
           }
         }
-      } while (++index < collisions.length);
-      final int counterOffset = hash << maxCollisionsShift;
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
+
+        int count = ((int) counters[counterIndex]) & 0xff;
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+
+        if (++index == collisions.length) {
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            return val;
+          }
+          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          return val;
+        }
+      }
     }
-    return val;
   }
 
   /**
@@ -383,59 +514,129 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   @SuppressWarnings("unchecked")
   public V putIfAbsent(final K key, final V val) {
     if (val == null) {
-      throw new NullPointerException("Cannot cache a null value.");
+      throw new NullPointerException("Cannot cache a null val.");
     }
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final V collision = collisions[index];
+      V collision = collisions[index];
       if (collision == null) {
-        if (index == 0) { // Nothing to swap with and over capacity.
-          if (strict && size.get() > capacity) {
-            return val; // TODO Async or parallel scan for 0 counts to expire?
-          } // If not strict, allows allow first entry into first collision index.
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+            return val;
+          }
         } else if (size.get() > capacity) {
           break;
         }
-        final Object witness = OA.compareAndExchangeRelease(collisions, index, null, val);
-        if (witness == null) {
-          BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
-          size.getAndIncrement();
-          return val;
-        }
-        if (isValForKey.test(key, witness)) {
-          return (V) witness;
-        }
-        continue;
-      }
-      if (isValForKey.test(key, collision)) {
-        return collision;
-      }
-    } while (++index < collisions.length);
-    index = 0;
-    synchronized (collisions) {
-      do { // Double-check locked volatile before swapping LFU to help prevent duplicates.
-        Object collision = OA.getVolatile(collisions, index);
-        if (collision == null) {
-          if (index > 0) { // Always allow entry at index 0, regardless of capacity.
-            break;
-          }
-          collision = OA.compareAndExchangeRelease(collisions, index, null, val);
+        do {
+          collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
           if (collision == null) {
             BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
             return val;
           }
+          if (isValForKey.test(key, collision)) {
+            return collision;
+          }
+        } while (++index < collisions.length && size.get() <= capacity);
+        break;
+      }
+      if (isValForKey.test(key, collision)) {
+        return collision;
+      }
+    } while (++index < collisions.length);
+
+    index = 0;
+    final int counterOffset = hash << maxCollisionsShift;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    synchronized (collisions) {
+      for (;;++counterIndex) {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) {  // Assume over capacity.
+          if (index == 0) {  // Strict capacity checked above.
+            collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+            if (collision == null) {
+              BA.setRelease(counters, counterIndex, initCount);
+              size.getAndIncrement();
+              return val;
+            }
+            if (isValForKey.test(key, collision)) {
+              return collision;
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
         }
+
         if (isValForKey.test(key, collision)) {
-          return (V) collision;
+          return collision;
         }
-      } while (++index < collisions.length);
-      final int counterOffset = hash << maxCollisionsShift;
-      decayAndSwapLFU(counterOffset, counterOffset + index, collisions, val);
+
+        int count = ((int) counters[counterIndex]) & 0xff;
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+
+        if (++index == collisions.length) {
+          OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+          BA.setRelease(counters, minCounterIndex, initCount);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            return val;
+          }
+          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          return val;
+        }
+      }
     }
-    return val;
+  }
+
+  private void decayAndDrop(final int counterOffset, final int maxCounterIndex, final int skipIndex,
+      final V[] collisions) {
+    int counterIndex = counterOffset;
+    do {
+      if (counterIndex == skipIndex) {
+        continue;
+      }
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      if (count == 0) {
+        if (counterIndex < skipIndex) {
+          continue;
+        }
+        size.getAndDecrement();
+        for (int collisionIndex = counterIndex - counterOffset,
+             nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
+          // Element at collisionIndex is a zero count known non-null that cannot be
+          // concurrently swapped, or a collision that has already been moved to the left.
+          OA.setRelease(collisions, collisionIndex, null);
+          if (nextCollisionIndex == collisions.length) {
+            return;
+          }
+          final Object next = OA.getAcquire(collisions, nextCollisionIndex);
+          if (next == null) {
+            return;
+          }
+          // - Try to slide new data and its counter to the front.
+          // - If a new collision concurrently sneaks in, break out.
+          if (OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+            return;
+          }
+          // Counter misses may occur during this transition.
+          count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
+          BA.setRelease(counters, counterIndex - 1, (byte) (count >> 2));
+        }
+      }
+      // Counter misses may occur between these two calls.
+      BA.setRelease(counters, counterIndex, (byte) (count >> 2));
+    } while (++counterIndex < maxCounterIndex);
   }
 
   /**
@@ -445,27 +646,29 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   @SuppressWarnings("unchecked")
   public V putIfSpaceAbsent(final K key, final V val) {
     if (val == null) {
-      throw new NullPointerException("Cannot cache a null value.");
+      throw new NullPointerException("Cannot cache a null val.");
     }
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final V collision = collisions[index];
+      V collision = collisions[index];
       if (collision == null) {
-        if (size.get() > capacity) {
-          return null;
+        for (;size.get() <= capacity;) {
+          collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+          if (collision == null) {
+            BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
+            size.getAndIncrement();
+            return val;
+          }
+          if (isValForKey.test(key, collision)) {
+            return collision;
+          }
+          if (++index == collisions.length) {
+            return null;
+          }
         }
-        final Object witness = OA.compareAndExchangeRelease(collisions, index, null, val);
-        if (witness == null) {
-          BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
-          size.getAndIncrement();
-          return val;
-        }
-        if (isValForKey.test(key, witness)) {
-          return (V) witness;
-        }
-        continue;
+        return null;
       }
       if (isValForKey.test(key, collision)) {
         return collision;
@@ -481,40 +684,40 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
   @SuppressWarnings("unchecked")
   public V putIfSpaceReplace(final K key, final V val) {
     if (val == null) {
-      throw new NullPointerException("Cannot cache a null value.");
+      throw new NullPointerException("Cannot cache a null val.");
     }
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      Object collision = OA.getVolatile(collisions, index);
+      V collision = (V) OA.getAcquire(collisions, index);
       if (collision == null) {
-        if (size.get() > capacity) {
-          return null;
+        for (;size.get() <= capacity;) {
+          collision = (V) OA.compareAndExchangeRelease(collisions, index, null, val);
+          if (collision == null) {
+            BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
+            size.getAndIncrement();
+            return val;
+          }
+          if (isValForKey.test(key, collision)) {
+            return collision; // If another thread raced to PUT, let it win.
+          }
+          if (++index == collisions.length) {
+            return null;
+          }
         }
-        collision = OA.compareAndExchangeRelease(collisions, index, null, val);
-        if (collision == null) {
-          BA.setRelease(counters, (hash << maxCollisionsShift) + index, initCount);
-          size.getAndIncrement();
-          return val;
-        }
-        // If another thread raced to PUT, let it win.
-        if (isValForKey.test(key, collision)) {
-          return (V) collision;
-        }
-        continue;
+        return null;
       }
       if (collision == val) {
         return val;
       }
       if (isValForKey.test(key, collision)) {
-        final Object witness = OA.compareAndExchangeRelease(collisions, index, collision, val);
+        final V witness = (V) OA.compareAndExchangeRelease(collisions, index, collision, val);
         if (witness == collision) {
           return val;
         }
-        // If another thread raced to PUT, let it win.
         if (isValForKey.test(key, witness)) {
-          return (V) witness;
+          return witness; // If another thread raced to PUT, let it win.
         }
       }
     } while (++index < collisions.length);

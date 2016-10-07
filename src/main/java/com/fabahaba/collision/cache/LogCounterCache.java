@@ -26,13 +26,13 @@ abstract class LogCounterCache {
    *
    * @param index Array index of the counter to increment.
    */
-  void atomicIncrement(final int index) {
-    for (int count = ((int) BA.getVolatile(counters, index)) & 0xff;count != 0xff;) {
+  final void atomicIncrement(final int index) {
+    for (int count = ((int) BA.getAcquire(counters, index)) & 0xff;count != 0xff;) {
       if (count <= initCount) {
         if (BA.compareAndSet(counters, index, (byte) count, (byte) (count + 1))) {
           return;
         }
-        count = ((int) BA.getVolatile(counters, index)) & 0xff;
+        count = ((int) BA.getAcquire(counters, index)) & 0xff;
         continue;
       }
       final double rand = 1.0 / ThreadLocalRandom.current().nextDouble();
@@ -40,7 +40,7 @@ abstract class LogCounterCache {
         return;
       }
       while (!BA.compareAndSet(counters, index, (byte) count, (byte) (count + 1))) {
-        count = ((int) BA.getVolatile(counters, index)) & 0xff;
+        count = ((int) BA.getAcquire(counters, index)) & 0xff;
         if (count == 0xff || (count > initCount && rand < count - initCount << pow2LogFactor)) {
           return;
         }
@@ -54,13 +54,28 @@ abstract class LogCounterCache {
    * factor to decrease the probability of a counter increment as the counter increases.
    *
    * @param maxCount The relative max count.  Once a counter is incremented this many times its
-   *                 value should be 255.
+   *                 val should be 255.
    * @return The power of two multiplication factor as the number of bits to shift.
    */
-  static final int calcLogFactorShift(final int maxCount) {
+  static int calcLogFactorShift(final int maxCount) {
     // Divide next highest power of 2 by 32,768... (256^2 / 2).
     // Then get the number of bits to shift for efficiency.
     // The result of this factor will cause the count to be 255 after maxCount increments.
     return Integer.numberOfTrailingZeros(Integer.highestOneBit(maxCount - 1) >> 14);
+  }
+
+  final void decay(final int counterOffset, final int maxCounterIndex, final int skipIndex) {
+    int counterIndex = counterOffset;
+    do {
+      if (counterIndex == skipIndex) {
+        continue;
+      }
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      if (count == 0) {
+        continue;
+      }
+      // Counter misses may occur between these two calls.
+      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+    } while (++counterIndex < maxCounterIndex);
   }
 }

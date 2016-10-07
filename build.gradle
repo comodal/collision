@@ -56,7 +56,6 @@ jmh {
   // Charts: http://nilskp.github.io/jmh-charts
   resultFormat = 'json'
   resultsFile = file("${buildDir}/reports/jmh/results.json")
-
   jvmArgs = '-server'
   failOnError = true
   forceGC = true

@@ -22,25 +22,25 @@ import org.openjdk.jmh.annotations.Warmup;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 @State(Scope.Benchmark)
-@Threads(Threads.MAX)
+@Threads(32)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 10)
 @Measurement(iterations = 20)
-public class LoadingBenchmark {
+public class LoadStaticZipfBenchmark {
 
   @Param({
-             "Cache2k",
+             //"Cache2k",
              "Caffeine",
-             //"Collision_No_Keys",
-             "Collision_With_Keys",
-             "Collision_With_Keys_Atomic"
+             "Collision",
+             "Collision_Load_Atomic"
          })
   BenchmarkFunctionFactory cacheType;
-  private Function<Long, Long> benchmarkFunction;
-  private Long[] keys;
+  Function<Long, Long> benchmarkFunction;
+  Long[] keys = new Long[SIZE];
 
   @State(Scope.Thread)
   public static class ThreadState {
@@ -48,24 +48,22 @@ public class LoadingBenchmark {
     int index = ThreadLocalRandom.current().nextInt();
   }
 
-  private static final int SIZE = 1 << 20;
-  private static final int MASK = SIZE - 1;
-  private static final int CAPACITY = 1 << 17;
-  private static final int ITEMS = SIZE / 3;
+  static final int SIZE = 1 << 20;
+  static final int MASK = SIZE - 1;
+  static final int CAPACITY = 1 << 17;
+  static final int ITEMS = SIZE / 3;
 
   @Setup
   public void setup() {
-    this.keys = new Long[SIZE];
-    final ScrambledZipfianGenerator generator = new ScrambledZipfianGenerator(ITEMS);
-    for (int i = 0;i < SIZE;i++) {
-      this.keys[i] = generator.nextValue();
-    }
     this.benchmarkFunction = cacheType.create();
-    for (final Long key : keys) {
+    final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(ITEMS);
+    IntStream.range(0, keys.length).parallel().forEach(i -> {
+      final Long key = generator.nextValue();
+      keys[i] = key;
       if (!key.equals(benchmarkFunction.apply(key))) {
         throw new IllegalStateException(cacheType + " returned invalid value.");
       }
-    }
+    });
   }
 
   @Benchmark
@@ -87,16 +85,20 @@ public class LoadingBenchmark {
     }
   }
 
+  private static Long punishMiss(final Long num) {
+    final double cubed = Math.pow(num, 3);
+    return (long) Math.cbrt(cubed);
+  }
+
   private static final Function<Long, Long> LOADER = num -> {
     amortizedSleep();
-    Math.pow(num, 3);
-    return num;
+    return punishMiss(num);
   };
 
   public enum BenchmarkFunctionFactory {
     Cache2k {
       @Override
-      Function<Long, Long> create() {
+      public Function<Long, Long> create() {
         final Cache<Long, Long> cache = Cache2kBuilder
             .of(Long.class, Long.class)
             .disableStatistics(true)
@@ -104,16 +106,16 @@ public class LoadingBenchmark {
             .loader(new CacheLoader<>() {
               public Long load(final Long key) throws Exception {
                 amortizedSleep();
-                Math.pow(key, 3);
-                return key;
+                return punishMiss(key);
               }
             }).build();
+        System.out.println(cache);
         return cache::get;
       }
     },
     Caffeine {
       @Override
-      Function<Long, Long> create() {
+      public Function<Long, Long> create() {
         final LoadingCache<Long, Long> cache = com.github.benmanes.caffeine.cache.Caffeine
             .newBuilder()
             .initialCapacity(CAPACITY)
@@ -122,33 +124,26 @@ public class LoadingBenchmark {
         return cache::get;
       }
     },
-    Collision_No_Keys {
+    Collision {
       @Override
-      Function<Long, Long> create() {
+      public Function<Long, Long> create() {
         final CollisionCache<Long, Long> cache = startCollision()
-            .setStoreKeys(false)
             .buildSparse(3.0);
+        System.out.println(cache);
         return cache::get;
       }
     },
-    Collision_With_Keys {
+    Collision_Load_Atomic {
       @Override
-      Function<Long, Long> create() {
+      public Function<Long, Long> create() {
         final CollisionCache<Long, Long> cache = startCollision()
-            .buildSparse(3.0);
-        return cache::get;
-      }
-    },
-    Collision_With_Keys_Atomic {
-      @Override
-      Function<Long, Long> create() {
-        final CollisionCache<Long, Long> cache = startCollision()
-            .buildSparse(3.0);
-        return cache::getLoadAtomic;
+            .buildSparse(5.0);
+        System.out.println(cache);
+        return key -> cache.getLoadAtomic(key, LOADER);
       }
     };
 
-    abstract Function<Long, Long> create();
+    public abstract Function<Long, Long> create();
   }
 
   private static LoadingCollisionBuilder<Long, Long, Long> startCollision() {
@@ -159,9 +154,52 @@ public class LoadingBenchmark {
             key -> {
               amortizedSleep();
               return key;
-            }, (key, num) -> {
-              Math.pow(num, 3);
-              return num;
-            });
+            }, (key, num) -> punishMiss(num));
+  }
+
+  public static void main(final String[] args) {
+    if (args.length == 0) {
+      runForMemProfiler("Collision_Load_Atomic");
+    }
+    for (final String arg : args) {
+      runForMemProfiler(arg);
+    }
+  }
+
+  private static double memEstimate(final Runtime rt) {
+    return (rt.totalMemory() - rt.freeMemory()) / 1048576.0;
+  }
+
+  private static void runForMemProfiler(final String cacheType) {
+    final BenchmarkFunctionFactory cacheFactory = BenchmarkFunctionFactory.valueOf(cacheType);
+    final Long[] keys = new Long[SIZE];
+    final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(ITEMS);
+    for (int i = 0;i < keys.length;i++) {
+      keys[i] = generator.nextValue();
+    }
+    final Runtime rt = Runtime.getRuntime();
+    rt.gc();
+    Thread.yield();
+    System.out.println("Estimating memory usage for " + cacheType);
+    final double baseUsage = memEstimate(rt);
+    System.out.format("%.2fmB base usage.%n", baseUsage);
+    final Function<Long, Long> benchmarkFunction = cacheFactory.create();
+    for (final Long key : keys) {
+      if (!key.equals(benchmarkFunction.apply(key))) {
+        throw new IllegalStateException(cacheType + " returned invalid value.");
+      }
+    }
+
+    for (;;) {
+      System.out.format("%.2fmB%n", memEstimate(rt) - baseUsage);
+      final Long key = keys[(int) (Math.random() * keys.length)];
+      System.out.println(key + " -> " + benchmarkFunction.apply(key));
+      try {
+        rt.gc();
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }

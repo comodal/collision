@@ -1,22 +1,16 @@
 package com.fabahaba.collision.benchmarks;
 
-final class ScrambledZipfianGenerator {
+final class ScrambledZipfGenerator {
 
   private static final double ZETAN = 26.46902820178302;
-  private static final long ITEM_COUNT = 10000000000L;
+  private static final long ITEM_COUNT = 10_000_000_000L;
 
-  private final ZipfianGenerator gen;
+  private final ZipfGenerator gen;
   private final long itemCount;
 
-  ScrambledZipfianGenerator(final long itemCount) {
-    this(itemCount - 1, ZipfianGenerator.ZIPFIAN_CONSTANT);
-  }
-
-  private ScrambledZipfianGenerator(final long max, final double zipfianConstant) {
-    this.itemCount = max + 1;
-    this.gen = zipfianConstant == ZipfianGenerator.ZIPFIAN_CONSTANT
-        ? new ZipfianGenerator(ITEM_COUNT, zipfianConstant, ZETAN)
-        : new ZipfianGenerator(ITEM_COUNT, zipfianConstant);
+  ScrambledZipfGenerator(final long itemCount) {
+    this.itemCount = itemCount;
+    this.gen = new ZipfGenerator(ITEM_COUNT, ZipfGenerator.ZIPF_CONSTANT, ZETAN);
   }
 
   long nextValue() {

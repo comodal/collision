@@ -17,8 +17,8 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 @State(Scope.Group)
 @BenchmarkMode(Mode.Throughput)
@@ -32,7 +32,7 @@ public class GetPutBenchmark {
              "Caffeine",
              "Collision"
          })
-  CacheFactory cacheFactory;
+  CacheFactory cacheType;
   private GetPutCache<Long, Boolean> cache;
   private Long[] keys;
 
@@ -40,62 +40,52 @@ public class GetPutBenchmark {
   private static final int MASK = SIZE - 1;
   private static final int ITEMS = SIZE / 3;
 
-  @State(Scope.Thread)
-  public static class ThreadState {
-
-    int index = ThreadLocalRandom.current().nextInt();
-  }
-
   @Setup
   public void setup() {
     keys = new Long[SIZE];
     final int capacity = SIZE / 2;
-    cache = cacheFactory.create(capacity);
-    for (long i = 0;i < capacity;i++) {
-      cache.put(i, Boolean.TRUE);
-    }
-    cache.clear();
-    final ScrambledZipfianGenerator generator = new ScrambledZipfianGenerator(ITEMS);
-    for (int i = 0;i < SIZE;i++) {
+    cache = cacheType.create(capacity);
+    final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(ITEMS);
+    IntStream.range(0, keys.length).parallel().forEach(i -> {
       final Long key = generator.nextValue();
-      this.keys[i] = key;
+      keys[i] = key;
       cache.put(key, Boolean.TRUE);
-    }
+    });
   }
 
   @Benchmark
   @Group("readOnly")
   @GroupThreads(16)
-  public Boolean readOnlyGet(ThreadState threadState) {
+  public Boolean readOnlyGet(LoadStaticZipfBenchmark.ThreadState threadState) {
     return cache.get(keys[threadState.index++ & MASK]);
   }
 
   @Benchmark
   @Group("writeOnly")
   @GroupThreads(16)
-  public void writeOnlyPut(ThreadState threadState) {
-    cache.put(keys[threadState.index++ & MASK], Boolean.TRUE);
+  public Boolean writeOnlyPut(LoadStaticZipfBenchmark.ThreadState threadState) {
+    return cache.put(keys[threadState.index++ & MASK], Boolean.TRUE);
   }
 
   @Benchmark
   @Group("readWrite")
   @GroupThreads(12)
-  public Boolean readWriteGet(ThreadState threadState) {
+  public Boolean readWriteGet(LoadStaticZipfBenchmark.ThreadState threadState) {
     return cache.get(keys[threadState.index++ & MASK]);
   }
 
   @Benchmark
   @Group("readWrite")
   @GroupThreads(4)
-  public void readWritePut(ThreadState threadState) {
-    cache.put(keys[threadState.index++ & MASK], Boolean.TRUE);
+  public Boolean readWritePut(LoadStaticZipfBenchmark.ThreadState threadState) {
+    return cache.put(keys[threadState.index++ & MASK], Boolean.TRUE);
   }
 
   private interface GetPutCache<K, V> {
 
     V get(final K key);
 
-    void put(final K key, final V val);
+    V put(final K key, final V val);
 
     void clear();
   }
@@ -119,8 +109,9 @@ public class GetPutBenchmark {
           }
 
           @Override
-          public void put(final K key, final V val) {
+          public V put(final K key, final V val) {
             cache.put(key, val);
+            return val;
           }
 
           @Override
@@ -146,8 +137,9 @@ public class GetPutBenchmark {
           }
 
           @Override
-          public void put(final K key, final V val) {
+          public V put(final K key, final V val) {
             cache.put(key, val);
+            return val;
           }
 
           @Override
@@ -172,8 +164,8 @@ public class GetPutBenchmark {
           }
 
           @Override
-          public void put(final K key, final V val) {
-            cache.putReplace(key, val);
+          public V put(final K key, final V val) {
+            return cache.putReplace(key, val);
           }
 
           @Override

@@ -22,7 +22,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
   private final V[][] hashTable;
   final int mask;
   final ToIntFunction<K> hashCoder;
-  final BiPredicate<K, Object> isValForKey;
+  final BiPredicate<K, V> isValForKey;
   private final Function<K, L> loader;
   private final BiFunction<K, L, V> mapper;
   private final Function<K, V> loadAndMap;
@@ -34,7 +34,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
       final int pow2LogFactor,
       final V[][] hashTable,
       final ToIntFunction<K> hashCoder,
-      final BiPredicate<K, Object> isValForKey,
+      final BiPredicate<K, V> isValForKey,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
     super(counters, initCount, pow2LogFactor);
@@ -59,7 +59,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * @return The hash bucket array, referred to as collisions.
    */
   @SuppressWarnings("unchecked")
-  V[] getCreateCollisions(final int hash) {
+  final V[] getCreateCollisions(final int hash) {
     V[] collisions = hashTable[hash];
     if (collisions == null) {
       collisions = (V[]) Array.newInstance(valueType, 1 << maxCollisionsShift);
@@ -73,7 +73,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public V get(final K key) {
+  public final V get(final K key) {
     return get(key, loader, mapper);
   }
 
@@ -81,7 +81,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public V get(final K key, final Function<K, L> loader) {
+  public final V get(final K key, final Function<K, L> loader) {
     return get(key, loader, mapper);
   }
 
@@ -89,7 +89,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public V getLoadAtomic(final K key) {
+  public final V getLoadAtomic(final K key) {
     return getLoadAtomic(key, loadAndMap);
   }
 
@@ -98,34 +98,77 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    */
   @Override
   @SuppressWarnings("unchecked")
-  public V getLoadAtomic(final K key, final Function<K, V> loadAndMap) {
+  public final V getLoadAtomic(final K key, final Function<K, V> loadAndMap) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
     for (int index = 0;;) {
       final V collision = collisions[index];
       if (collision == null) {
-        return checkDecayAndSwapLFU(counterOffset, collisions, key, loadAndMap);
+        return checkDecayAndSwap(counterOffset, collisions, key, loadAndMap);
       }
       if (isValForKey.test(key, collision)) {
         atomicIncrement(counterOffset + index);
         return collision;
       }
       if (++index == collisions.length) {
-        return checkDecayAndSwapLFU(counterOffset, collisions, key, loadAndMap);
+        return checkDecayAndProbSwap(counterOffset, collisions, key, loadAndMap);
       }
     }
   }
 
-  protected abstract V checkDecayAndSwapLFU(final int counterOffset, final V[] collisions,
+  abstract V checkDecayAndSwap(final int counterOffset, final V[] collisions,
       final K key, final Function<K, V> loadAndMap);
+
+  abstract V checkDecayAndProbSwap(final int counterOffset, final V[] collisions,
+      final K key, final Function<K, V> loadAndMap);
+
+  /**
+   * Divides all counters for values within a hash bucket (collisions), swaps the val for the
+   * least frequently used, and sets its counter to an initial val.  Also evicts the tail entry if
+   * its count is zero.
+   *
+   * @param counterOffset   beginning counter array index corresponding to collision values.
+   * @param maxCounterIndex Max counter index for known non null collision values.
+   * @param collisions      values sitting in a hash bucket.
+   * @param val           The value to put in place of the least frequently used value.
+   */
+  final void decayAndSwap(final int counterOffset, final int maxCounterIndex,
+      final V[] collisions, final V val) {
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = 0xff;
+    do {
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      if (count == 0) {
+        OA.setRelease(collisions, counterIndex - counterOffset, val);
+        BA.setRelease(counters, counterIndex, initCount);
+        while (++counterIndex < maxCounterIndex) {
+          count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+          if (count == 0) {
+            continue;
+          }
+          BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+        }
+        return;
+      }
+      // Counter misses may occur between these two calls.
+      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+      if (count < minCount) {
+        minCount = count;
+        minCounterIndex = counterIndex;
+      }
+    } while (++counterIndex < maxCounterIndex);
+    OA.setRelease(collisions, minCounterIndex - counterOffset, val);
+    BA.setRelease(counters, minCounterIndex, initCount);
+  }
 
   /**
    * {@inheritDoc}
    */
   @Override
   @SuppressWarnings("unchecked")
-  public V getIfPresent(final K key) {
+  public final V getIfPresent(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
@@ -147,18 +190,18 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    */
   @Override
   @SuppressWarnings("unchecked")
-  public V getIfPresentVolatile(final K key) {
+  public final V getIfPresentVolatile(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final Object val = OA.getVolatile(collisions, index);
+      final V val = (V) OA.getAcquire(collisions, index);
       if (val == null) {
         return null;
       }
       if (isValForKey.test(key, val)) {
         atomicIncrement((hash << maxCollisionsShift) + index);
-        return (V) val;
+        return val;
       }
     } while (++index < collisions.length);
     return null;
@@ -169,15 +212,15 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    */
   @Override
   @SuppressWarnings("unchecked")
-  public V replace(final K key, final V val) {
+  public final V replace(final K key, final V val) {
     if (val == null) {
-      throw new NullPointerException("Cannot cache a null value.");
+      throw new NullPointerException("Cannot cache a null val.");
     }
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final Object collision = OA.getVolatile(collisions, index);
+      final V collision = (V) OA.getAcquire(collisions, index);
       if (collision == null) {
         return null;
       }
@@ -185,13 +228,13 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
         return val;
       }
       if (isValForKey.test(key, collision)) {
-        final Object witness = OA.compareAndExchangeRelease(collisions, index, collision, val);
+        final V witness = (V) OA.compareAndExchangeRelease(collisions, index, collision, val);
         if (witness == collision) {
           return val;
         }
         // If another thread raced to PUT, let it win.
         if (isValForKey.test(key, witness)) {
-          return (V) witness;
+          return witness;
         }
       }
     } while (++index < collisions.length);
@@ -199,13 +242,13 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
   }
 
   @Override
-  public void clear() {
+  public final void clear() {
     IntStream.range(0, hashTable.length).parallel()
         .forEach(i -> Arrays.fill(hashTable[i], null));
   }
 
   @Override
-  public void nullBuckets() {
+  public final void nullBuckets() {
     IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);
   }
 

@@ -102,30 +102,30 @@ public class CollisionCacheTest {
     assertEquals(42, cache.putReplace(nine, 42).intValue());
   }
 
-  @Test
-  public void testPackedEntryCache() {
-    final CollisionCache<Integer, String> cache = CollisionCache
-        .<String>withCapacity(128)
-        .<Integer, String>setLoader(
-            key -> hashInteger(key),
-            (key, hash) -> hash)
-        .buildPacked();
-    for (int i = 0;i < expectedHashes.length;i++) {
-      final String expected = expectedHashes[i];
-      assertEquals(expected, cache.get(i));
-      assertEquals(expected, cache.getIfPresent(i));
-      assertEquals(expected, cache.getIfPresentVolatile(i));
-    }
-    cache.clear();
-    for (int i = 0;i < expectedHashes.length;i++) {
-      final String expected = expectedHashes[i];
-      assertEquals(expected, cache.getLoadAtomic(i));
-      assertEquals(expected, cache.getIfPresent(i));
-      assertEquals(expected, cache.getIfPresentVolatile(i));
-    }
-    cache.nullBuckets();
-    assertNull(cache.getIfPresent(1));
-  }
+  //  @Test
+  //  public void testPackedEntryCache() {
+  //    final CollisionCache<Integer, String> cache = CollisionCache
+  //        .<String>withCapacity(128)
+  //        .<Integer, String>setLoader(
+  //            key -> hashInteger(key),
+  //            (key, hash) -> hash)
+  //        .buildPacked();
+  //    for (int i = 0;i < expectedHashes.length;i++) {
+  //      final String expected = expectedHashes[i];
+  //      assertEquals(expected, cache.get(i));
+  //      assertEquals(expected, cache.getIfPresent(i));
+  //      assertEquals(expected, cache.getIfPresentVolatile(i));
+  //    }
+  //    cache.clear();
+  //    for (int i = 0;i < expectedHashes.length;i++) {
+  //      final String expected = expectedHashes[i];
+  //      assertEquals(expected, cache.getLoadAtomic(i));
+  //      assertEquals(expected, cache.getIfPresent(i));
+  //      assertEquals(expected, cache.getIfPresentVolatile(i));
+  //    }
+  //    cache.nullBuckets();
+  //    assertNull(cache.getIfPresent(1));
+  //  }
 
   @Test
   public void testSparseEntryCache() {

@@ -99,11 +99,11 @@ public final class LoadingCollisionBuilder<K, L, V> {
     return this;
   }
 
-  public BiPredicate<K, Object> getIsValForKey() {
+  public BiPredicate<K, V> getIsValForKey() {
     return delegate.getIsValForKey();
   }
 
-  public LoadingCollisionBuilder<K, L, V> setIsValForKey(final BiPredicate<K, Object> isValForKey) {
+  public LoadingCollisionBuilder<K, L, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
     delegate.setIsValForKey(isValForKey);
     return this;
   }
