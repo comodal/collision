@@ -67,7 +67,7 @@ public class LoadStaticZipfBenchmark {
   }
 
   @Benchmark
-  public Long spread(final ThreadState threadState) {
+  public Long getSpread(final ThreadState threadState) {
     return benchmarkFunction.apply(keys[threadState.index++ & MASK]);
   }
 

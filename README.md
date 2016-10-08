@@ -30,14 +30,14 @@ These benchmarks are intended to mimic those found in the [Caffeine Cache](https
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
 * VM: JDK 9-ea+138 / options: -server
 
-####[Loading Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/LoadingBenchmark.java#L56)
+####Loading Zipf Benchmarks
 
 Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
 
 ```java
 CollisionCache
   .withCapacity(capacity, Long.class)
-  .setStrictCapacity(true)
+  .setStrictCapacity(true) // default
   .setLoader(
     key -> {
       amortizedSleep(); // Sleeps 1ms every (10.0 / 1000.0)% of calls.
@@ -45,30 +45,19 @@ CollisionCache
     }, (key, num) -> punishMiss(num))
   .buildSparse(5.0);
 ```
+#####[Static Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadStaticZipfBenchmark.java#L70)
 
-![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
+The same data set is used for all iterations. 
+
+TODO ```![loading-cache-static-zipf](benchmark/loading-cache-static-zipf.png)```
+
+#####[Moving Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadMovingZipfBenchmark.java#L52)
+
+A new subset of data is generated every iteration from the same Zipf generator across a range of 10 billion values.
+
+TODO ```![loading-cache-moving-zipf](benchmark/loading-cache-moving-zipf.png)```
 
 > JMH 1.15, 20 threads, 10 warm-up & 20 measurement iterations.
-
-####[Get Put Benchmark](src/jmh/java/com/fabahaba/collision/benchmarks/GetPutBenchmark.java#L50)
-
-Tests get and put operations against a cache pre-populated with a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution.
-
-```java
-CollisionCache
-  .<V>withCapacity(capacity)
-  .setStrictCapacity(true)
-  .buildSparse(3.0);
-```
-
-![read-only-and-write-only-throughput](benchmark/read-only-and-write-only-throughput.png)
-
-> JMH 1.15, 16 threads, 10 warm-up & 20 measurement iterations.
-
-![read-write-throughput](benchmark/read-write-throughput.png)
-
-> JMH 1.15, 12 read & 4 write threads, 10 warm-up & 20 measurement iterations.
-
 
 ###Implementation Notes & Cache Types
 * Collision caches are backed by a large two dimensional array of generic values or java.until.Map.Entry's if storing keys.  Each hash bucket is fixed in length and should be kept small.
@@ -87,11 +76,11 @@ The number of slots in the hash table is the next power of two greater than `(sp
 
 The hash table, a two dimensional array, is completely initialized by default.  If using a large `sparseFactor` consider setting `lazyInitBuckets` to true to save space.
 
-If not strictly limiting, capacity can be exceeded by:
+If not strictly limiting, capacity can be exceeded by the following number of entries:
 ```
 (nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)
 ```
-For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.  Followed by all remaining empty buckets being accessed before full buckets are accessed, avoiding the dropping of zero count elements.
+For this to happen, the same `capacity / bucketSize` buckets would have to fill up before any other buckets are accessed for writes.  Followed by all remaining empty buckets being accessed before full buckets are accessed, avoiding the eviction of zero count elements from crowded buckets.
 
 ###Contribute
 Pull requests for benchmarks and tests are welcome. Feel free to open an issue for feature requests, ideas, or issues.
