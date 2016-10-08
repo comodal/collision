@@ -18,5 +18,5 @@ public interface LoadingCollisionCache<K, L, V> extends CollisionCache<K, V> {
    * @param loader creates values in the event of a cache miss.
    * @return a value for the corresponding key.
    */
-  V get(final K key, final Function<K, L> loader);
+  V getAggressive(final K key, final Function<K, L> loader);
 }

@@ -25,7 +25,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    */
   @Override
   @SuppressWarnings("unchecked")
-  public <I> V get(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper) {
+  public <I> V getAggressive(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;

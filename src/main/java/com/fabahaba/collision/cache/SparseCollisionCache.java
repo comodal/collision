@@ -42,7 +42,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
    */
   @Override
   @SuppressWarnings("unchecked")
-  public <I> V get(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper) {
+  public <I> V getAggressive(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
@@ -357,7 +357,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
         while (++counterIndex < maxCounterIndex) {
           count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
           if (count > 0) {
-            BA.setRelease(counters, counterIndex, (byte) (count >> 2));
+            BA.setRelease(counters, counterIndex, (byte) (count >> 1));
             continue;
           }
           size.getAndDecrement();
@@ -380,13 +380,13 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
             }
             // - Counter misses may occur during this transition.
             count = ((int) BA.getAcquire(counters, counterIndex + 1)) & 0xff;
-            BA.setRelease(counters, counterIndex++, (byte) (count >> 2));
+            BA.setRelease(counters, counterIndex++, (byte) (count >> 1));
           }
         }
         return;
       }
       // Counter misses may occur between these two calls.
-      BA.setRelease(counters, counterIndex, (byte) (count >> 2));
+      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
       if (count < minCount) {
         minCount = count;
         minCounterIndex = counterIndex;
@@ -631,11 +631,11 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           }
           // Counter misses may occur during this transition.
           count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
-          BA.setRelease(counters, counterIndex - 1, (byte) (count >> 2));
+          BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
         }
       }
       // Counter misses may occur between these two calls.
-      BA.setRelease(counters, counterIndex, (byte) (count >> 2));
+      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
     } while (++counterIndex < maxCounterIndex);
   }
 

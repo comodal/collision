@@ -66,24 +66,24 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
+  public final V getAggressive(final K key) {
+    return getAggressive(key, loader, mapper);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public final V getAggressive(final K key, final Function<K, L> loader) {
+    return getAggressive(key, loader, mapper);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
   public final V get(final K key) {
-    return get(key, loader, mapper);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public final V get(final K key, final Function<K, L> loader) {
-    return get(key, loader, mapper);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public final V getLoadAtomic(final K key) {
-    return getLoadAtomic(key, loadAndMap);
+    return get(key, loadAndMap);
   }
 
   /**
@@ -91,7 +91,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
    */
   @Override
   @SuppressWarnings("unchecked")
-  public final V getLoadAtomic(final K key, final Function<K, V> loadAndMap) {
+  public final V get(final K key, final Function<K, V> loadAndMap) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
@@ -183,7 +183,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
    */
   @Override
   @SuppressWarnings("unchecked")
-  public final V getIfPresentVolatile(final K key) {
+  public final V getIfPresentAcquire(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
@@ -232,19 +232,28 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
     return null;
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public final void clear() {
     IntStream.range(0, hashTable.length)
         .parallel()
         .forEach(i -> {
-          int index = 0;
           final KeyVal[] collisions = hashTable[i];
+          if (collisions == null) {
+            return;
+          }
+          int index = 0;
           do {
             collisions[index++] = null;
           } while (index < collisions.length);
         });
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public final void nullBuckets() {
     IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);

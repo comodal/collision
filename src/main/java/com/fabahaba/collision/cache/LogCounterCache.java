@@ -27,20 +27,25 @@ abstract class LogCounterCache {
    * @param index Array index of the counter to increment.
    */
   final void atomicIncrement(final int index) {
-    for (int count = ((int) BA.getAcquire(counters, index)) & 0xff;count != 0xff;) {
+    byte witness = (byte) BA.getAcquire(counters, index);
+    for (int count = ((int) witness) & 0xff;count != 0xff;) {
       if (count <= initCount) {
-        if (BA.compareAndSet(counters, index, (byte) count, (byte) (count + 1))) {
+        if (witness == (byte) BA
+            .compareAndExchangeRelease(counters, index, witness, (byte) (count + 1))) {
           return;
         }
-        count = ((int) BA.getAcquire(counters, index)) & 0xff;
+        witness = (byte) BA.getAcquire(counters, index);
+        count = ((int) witness) & 0xff;
         continue;
       }
       final double rand = 1.0 / ThreadLocalRandom.current().nextDouble();
       if (rand < count - initCount << pow2LogFactor) {
         return;
       }
-      while (!BA.compareAndSet(counters, index, (byte) count, (byte) (count + 1))) {
-        count = ((int) BA.getAcquire(counters, index)) & 0xff;
+      while (witness != (byte) BA
+          .compareAndExchangeRelease(counters, index, witness, (byte) (count + 1))) {
+        witness = (byte) BA.getAcquire(counters, index);
+        count = ((int) witness) & 0xff;
         if (count == 0xff || (count > initCount && rand < count - initCount << pow2LogFactor)) {
           return;
         }
@@ -53,13 +58,13 @@ abstract class LogCounterCache {
    * Used in conjunction with {@link #atomicIncrement atomicIncrement} as a multiplication
    * factor to decrease the probability of a counter increment as the counter increases.
    *
-   * @param maxCount The relative max count.  Once a counter is incremented this many times its
-   *                 val should be 255.
+   * @param maxCount The relative max count.  Once a counter is incremented this many times its val
+   *                 should be 255.
    * @return The power of two multiplication factor as the number of bits to shift.
    */
   static int calcLogFactorShift(final int maxCount) {
     // Divide next highest power of 2 by 32,768... (256^2 / 2).
-    // Then get the number of bits to shift for efficiency.
+    // Then getAggressive the number of bits to shift for efficiency.
     // The result of this factor will cause the count to be 255 after maxCount increments.
     return Integer.numberOfTrailingZeros(Integer.highestOneBit(maxCount - 1) >> 14);
   }

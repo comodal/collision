@@ -130,7 +130,7 @@ public class LoadStaticZipfBenchmark {
         final CollisionCache<Long, Long> cache = startCollision()
             .buildSparse(3.0);
         System.out.println(cache);
-        return cache::get;
+        return cache::getAggressive;
       }
     },
     Collision_Load_Atomic {
@@ -139,7 +139,7 @@ public class LoadStaticZipfBenchmark {
         final CollisionCache<Long, Long> cache = startCollision()
             .buildSparse(5.0);
         System.out.println(cache);
-        return key -> cache.getLoadAtomic(key, LOADER);
+        return key -> cache.get(key, LOADER);
       }
     };
 
