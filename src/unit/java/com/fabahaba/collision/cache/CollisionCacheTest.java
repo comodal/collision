@@ -1,6 +1,4 @@
-package com.fabahaba.collission.cache;
-
-import com.fabahaba.collision.cache.CollisionCache;
+package com.fabahaba.collision.cache;
 
 import org.junit.Test;
 

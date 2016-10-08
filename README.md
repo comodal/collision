@@ -30,7 +30,7 @@ These benchmarks are intended to mimic those found in the [Caffeine Cache](https
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
 * VM: JDK 9-ea+138 / options: -server
 
-####Loading Zipf Benchmarks
+####Loading Cache: Zipf Benchmarks
 
 Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
 
@@ -47,20 +47,22 @@ CollisionCache
 ```
 #####[Static Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadStaticZipfBenchmark.java#L70)
 
-The same data set is used for all iterations. 
+The same collection of keys is used for all iterations. 
 
 TODO ```![loading-cache-static-zipf](benchmark/loading-cache-static-zipf.png)```
 
+> JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
+
 #####[Moving Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadMovingZipfBenchmark.java#L52)
 
-A new subset of data is generated every iteration from the same Zipf generator across a range of 10 billion values.
+A new collection of keys is generated every iteration from the same Zipf generator across a range of 10 billion keys.
 
 TODO ```![loading-cache-moving-zipf](benchmark/loading-cache-moving-zipf.png)```
 
-> JMH 1.15, 20 threads, 10 warm-up & 20 measurement iterations.
+> JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
 
 ###Implementation Notes & Cache Types
-* Collision caches are backed by a large two dimensional array of generic values or java.until.Map.Entry's if storing keys.  Each hash bucket is fixed in length and should be kept small.
+* Collision caches are backed by a large two dimensional array of generic values or [KeyVal](src/main/java/com/fabahaba/collision/cache/KeyVal.java) wrappers if storing keys.  Each hash bucket is fixed in length and should be kept small.
 * Hash tables are sized as a power of two.  Hash codes for keys are masked against `hashTable.length - 1` for indexing.
 * A single large byte[] stores a counter for each possible entry.
 
