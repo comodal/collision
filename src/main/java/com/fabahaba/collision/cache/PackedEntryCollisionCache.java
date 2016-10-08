@@ -95,7 +95,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) counters[counterIndex]) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -150,7 +150,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) counters[counterIndex]) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -257,7 +257,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) counters[counterIndex]) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -348,7 +348,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
         }
 
-        int count = ((int) counters[counterIndex]) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -409,7 +409,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         if (key.equals(collision.key)) {
           return collision.val;
         }
-        int count = ((int) counters[counterIndex]) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
