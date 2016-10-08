@@ -24,11 +24,11 @@ public class LogCounterTest {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
       final double delta = Math.max(minDelta, expected * deltaPercentage);
       System.out.println(expected
-          + " <> " + counters.getCount(counterIndex)
+          //    + " <> " + counters.getCount(counterIndex)
           + " <> " + counters.getAcquireCount(counterIndex));
       // assertEquals(expected, counters.getCount(counterIndex), delta);
       assertEquals(expected, counters.getAcquireCount(counterIndex), delta);
-      if (expected == max) {
+      if (previousExpected == max) {
         break;
       }
       i = log;
@@ -41,7 +41,7 @@ public class LogCounterTest {
 
     for (int i = 0;i < numCounters;++i) {
       if (i == counterIndex) {
-        assertEquals(max, counters.getAcquireCount(i), max * .07);
+        assertEquals(max, counters.getAcquireCount(i));
       } else {
         assertEquals(0, counters.getAcquireCount(i));
       }
