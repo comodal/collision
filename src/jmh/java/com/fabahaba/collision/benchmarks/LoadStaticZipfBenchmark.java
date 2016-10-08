@@ -33,10 +33,10 @@ import java.util.stream.IntStream;
 public class LoadStaticZipfBenchmark {
 
   @Param({
-             //"Cache2k",
+             "Cache2k",
              "Caffeine",
              "Collision",
-             "Collision_Load_Atomic"
+             "Collision_Aggressive"
          })
   BenchmarkFunctionFactory cacheType;
   Function<Long, Long> benchmarkFunction;
@@ -128,18 +128,18 @@ public class LoadStaticZipfBenchmark {
       @Override
       public Function<Long, Long> create() {
         final CollisionCache<Long, Long> cache = startCollision()
-            .buildSparse(3.0);
-        System.out.println(cache);
-        return cache::getAggressive;
-      }
-    },
-    Collision_Load_Atomic {
-      @Override
-      public Function<Long, Long> create() {
-        final CollisionCache<Long, Long> cache = startCollision()
             .buildSparse(5.0);
         System.out.println(cache);
         return key -> cache.get(key, LOADER);
+      }
+    },
+    Collision_Aggressive {
+      @Override
+      public Function<Long, Long> create() {
+        final CollisionCache<Long, Long> cache = startCollision()
+            .buildSparse(3.0);
+        System.out.println(cache);
+        return cache::getAggressive;
       }
     };
 
@@ -159,7 +159,7 @@ public class LoadStaticZipfBenchmark {
 
   public static void main(final String[] args) {
     if (args.length == 0) {
-      runForMemProfiler("Collision_Load_Atomic");
+      runForMemProfiler("Collision");
     }
     for (final String arg : args) {
       runForMemProfiler(arg);

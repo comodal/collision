@@ -8,7 +8,7 @@ CollisionCache<Key, Value> cache = CollisionCache
   .<Key, byte[]>setLoader(
     guid -> loadFromDisk(guid), 
     (guid, loaded) -> deserialize(loaded))
-  .setIsValForKey((guid, val) -> ((Value) val).getGUID().equals(guid))
+  .setIsValForKey((guid, val) -> guid.equals(val.getGUID()))
   .buildSparse();
 ```
 
@@ -16,10 +16,11 @@ CollisionCache<Key, Value> cache = CollisionCache
 * Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `boolean isValForKey(K key, V val)`, then keys will not be stored.
   * For use cases with large keys relative to the size of values, using that space to store more values may dramatically improve performance.
 * Two-phase loading to separate loading of raw data and deserialization/parsing of data.  Helps to prevent unnecessary processing.
-* Uses CAS atomic operations as much as possible to optimize for concurrent access.
+* Uses CAS atomic operations as much as possible to optimize for concurrent access.  Specifically, Java 9 acquire/release semantics exposed through VarHandles.
 * Optional user supplied `int hashCode(K key)` function.
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
 * Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/LogCounterCache.java#L29) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
+* Atomic or aggressive loading of missing values.
 
 ###Benchmarks
 
@@ -41,12 +42,8 @@ CollisionCache
     key -> {
       amortizedSleep(); // Sleeps 1ms every (10.0 / 1000.0)% of calls.
       return key;
-    }, (key, num) -> {
-      Math.pow(num, 3); // Something else to punish the miss.
-      return num;
-    })
-  .setStoreKeys(false) // Also ran with key storage (true).
-  .buildSparse(3.0);
+    }, (key, num) -> punishMiss(num))
+  .buildSparse(5.0);
 ```
 
 ![loading-cache-get-throughput](benchmark/loading-cache-get-throughput.png)
@@ -90,11 +87,11 @@ The number of slots in the hash table is the next power of two greater than `(sp
 
 The hash table, a two dimensional array, is completely initialized by default.  If using a large `sparseFactor` consider setting `lazyInitBuckets` to true to save space.
 
-If not strictly limiting the capacity, the number of entries can exceed capacity by:
+If not strictly limiting, capacity can be exceeded by:
 ```
 (nextPow2(sparseFactor * capacity - 1) / bucketSize) - (capacity / bucketSize)
 ```
-For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.
+For this to happen, the same `capacity / bucketSize` buckets would have to perfectly fill up before any other buckets are accessed for writes.  Followed by all remaining empty buckets being accessed before full buckets are accessed, avoiding the dropping of zero count elements.
 
 ###Contribute
 Pull requests for benchmarks and tests are welcome. Feel free to open an issue for feature requests, ideas, or issues.

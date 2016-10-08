@@ -27,13 +27,13 @@ import static com.fabahaba.collision.benchmarks.LoadStaticZipfBenchmark.SIZE;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 10)
 @Measurement(iterations = 20)
-public class LoadNewZipfBenchmark {
+public class LoadMovingZipfBenchmark {
 
   @Param({
-             //"Cache2k",
+             "Cache2k",
              "Caffeine",
              "Collision",
-             "Collision_Load_Atomic"
+             "Collision_Aggressive"
          })
   LoadStaticZipfBenchmark.BenchmarkFunctionFactory cacheType;
   Function<Long, Long> benchmarkFunction;

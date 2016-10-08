@@ -69,6 +69,13 @@ abstract class LogCounterCache {
     return Integer.numberOfTrailingZeros(Integer.highestOneBit(maxCount - 1) >> 14);
   }
 
+  /**
+   * Divides all values by two within the range [counterOffset, maxCounterIndex) except skipIndex.
+   *
+   * @param counterOffset   inclusive counter index to start at.
+   * @param maxCounterIndex exclusive max index for the counters to decay.
+   * @param skipIndex       Skips decay for this entry because it is a brand new.
+   */
   final void decay(final int counterOffset, final int maxCounterIndex, final int skipIndex) {
     int counterIndex = counterOffset;
     do {
