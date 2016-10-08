@@ -27,34 +27,36 @@ abstract class LogCounterCache {
    * @param index Array index of the counter to increment.
    */
   final void atomicIncrement(final int index) {
-    byte expected;
     byte witness = (byte) BA.getAcquire(counters, index);
-    for (int count = ((int) witness) & 0xff;count != 0xff;) {
-      if (count <= initCount) {
-        expected = witness;
-        witness = (byte) BA
-            .compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-        if (expected == witness) {
-          return;
-        }
-        count = ((int) witness) & 0xff;
-        continue;
-      }
-      final double rand = 1.0 / ThreadLocalRandom.current().nextDouble();
-      if (rand < count - initCount << pow2LogFactor) {
+    int count = ((int) witness) & 0xff;
+    if (count == 0xff) {
+      return;
+    }
+    byte expected;
+    while (count <= initCount) {
+      expected = witness;
+      witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      if (expected == witness) {
         return;
       }
-      for (;;) {
-        expected = witness;
-        witness = (byte) BA
-            .compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-        if (expected == witness) {
-          return;
-        }
-        count = ((int) witness) & 0xff;
-        if (count == 0xff || (count > initCount && rand < count - initCount << pow2LogFactor)) {
-          return;
-        }
+      count = ((int) witness) & 0xff;
+      if (count == 0xff) {
+        return;
+      }
+    }
+    final double rand = 1.0 / ThreadLocalRandom.current().nextDouble();
+    if (rand < (count - initCount) << pow2LogFactor) {
+      return;
+    }
+    for (;;) {
+      expected = witness;
+      witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      if (expected == witness) {
+        return;
+      }
+      count = ((int) witness) & 0xff;
+      if (count == 0xff || (count > initCount && rand < (count - initCount) << pow2LogFactor)) {
+        return;
       }
     }
   }
