@@ -57,7 +57,7 @@ TODO ```![loading-cache-static-zipf](benchmark/loading-cache-static-zipf.png)```
 
 A new collection of keys is generated every iteration from the same Zipf generator across a range of 10 billion keys.
 
-TODO ```![loading-cache-moving-zipf](benchmark/loading-cache-moving-zipf.png)```
+![loading-cache-moving-zipf](https://cdn.rawgit.com/jamespedwards42/collision/master/benchmark/loading-cache-moving-zipf.svg)
 
 > JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
 
