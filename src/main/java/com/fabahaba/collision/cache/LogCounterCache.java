@@ -27,14 +27,16 @@ abstract class LogCounterCache {
    * @param index Array index of the counter to increment.
    */
   final void atomicIncrement(final int index) {
+    byte expected;
     byte witness = (byte) BA.getAcquire(counters, index);
     for (int count = ((int) witness) & 0xff;count != 0xff;) {
       if (count <= initCount) {
-        if (witness == (byte) BA
-            .compareAndExchangeRelease(counters, index, witness, (byte) (count + 1))) {
+        expected = witness;
+        witness = (byte) BA
+            .compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+        if (expected == witness) {
           return;
         }
-        witness = (byte) BA.getAcquire(counters, index);
         count = ((int) witness) & 0xff;
         continue;
       }
@@ -42,15 +44,18 @@ abstract class LogCounterCache {
       if (rand < count - initCount << pow2LogFactor) {
         return;
       }
-      while (witness != (byte) BA
-          .compareAndExchangeRelease(counters, index, witness, (byte) (count + 1))) {
-        witness = (byte) BA.getAcquire(counters, index);
+      for (;;) {
+        expected = witness;
+        witness = (byte) BA
+            .compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+        if (expected == witness) {
+          return;
+        }
         count = ((int) witness) & 0xff;
         if (count == 0xff || (count > initCount && rand < count - initCount << pow2LogFactor)) {
           return;
         }
       }
-      return;
     }
   }
 
