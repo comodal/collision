@@ -18,7 +18,7 @@ public class LogCounterTest {
     final int counterIndex = 3;
 
     double deltaPercentage = .25;
-    final double minDelta = 8;
+    final double minDelta = 10;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0, expected = 4;;) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));

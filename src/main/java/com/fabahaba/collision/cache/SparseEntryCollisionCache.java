@@ -86,7 +86,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   /**
-   * This method assumes a full bucket or (XOR) over capacity and checks for both (AND).
+   * This method assumes either or both a full bucket and to be over capacity.
    */
   @SuppressWarnings("unchecked")
   private <I> V checkDecayAndProbSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
