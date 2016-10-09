@@ -40,7 +40,8 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    */
   @Override
   @SuppressWarnings("unchecked")
-  public <I> V getAggressive(final K key, final Function<K, I> loader, final BiFunction<K, I, V> mapper) {
+  public <I> V getAggressive(final K key, final Function<K, I> loader,
+      final BiFunction<K, I, V> mapper) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
@@ -96,7 +97,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           final V val = mapper.apply(key, loaded);
@@ -130,16 +131,16 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           final V val = mapper.apply(key, loaded);
           OA.setRelease(collisions, minCounterIndex - counterOffset, new KeyVal(key, val));
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -154,7 +155,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           if (index == 0) { // Strict capacity checked in parent call.
@@ -186,15 +187,15 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           OA.setRelease(collisions, minCounterIndex - counterOffset, entry);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return entry.val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return entry.val;
         }
       }
@@ -281,7 +282,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
@@ -328,7 +329,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           final V val = loadAndMap.apply(key);
           if (val == null) {
@@ -337,10 +338,10 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           OA.setRelease(collisions, minCounterIndex - counterOffset, new KeyVal(key, val));
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -555,10 +556,10 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           OA.setRelease(collisions, minCounterIndex - counterOffset, entry);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -611,7 +612,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) {  // Assume over capacity.
           if (entry == null) {
@@ -644,7 +645,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           if (entry == null) {
             entry = new KeyVal(key, val);
@@ -652,10 +653,10 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           OA.setRelease(collisions, minCounterIndex - counterOffset, entry);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }

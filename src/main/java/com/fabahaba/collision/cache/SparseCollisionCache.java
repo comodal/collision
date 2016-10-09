@@ -99,7 +99,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           final V val = mapper.apply(key, loaded);
@@ -132,16 +132,16 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           final V val = mapper.apply(key, loaded);
           OA.setRelease(collisions, minCounterIndex - counterOffset, val);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -156,7 +156,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           if (index == 0) { // Strict capacity checked in parent call.
@@ -188,15 +188,15 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           OA.setRelease(collisions, minCounterIndex - counterOffset, val);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -279,7 +279,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
@@ -325,7 +325,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           final V val = loadAndMap.apply(key);
           if (val == null) {
@@ -334,10 +334,10 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           OA.setRelease(collisions, minCounterIndex - counterOffset, val);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -452,7 +452,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
         if (collision == null) {  // Assume over capacity.
           if (index == 0) {  // Strict capacity checked above.
@@ -492,15 +492,15 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           OA.setRelease(collisions, minCounterIndex - counterOffset, val);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
@@ -554,7 +554,7 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
     synchronized (collisions) {
-      for (;;++counterIndex) {
+      for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
         if (collision == null) {  // Assume over capacity.
           if (index == 0) {  // Strict capacity checked above.
@@ -584,15 +584,15 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           minCount = count;
           minCounterIndex = counterIndex;
         }
-
+        ++counterIndex;
         if (++index == collisions.length) {
           OA.setRelease(collisions, minCounterIndex - counterOffset, val);
           BA.setRelease(counters, minCounterIndex, initCount);
           if (size.get() > capacity) {
-            decayAndDrop(counterOffset, counterIndex + 1, minCounterIndex, collisions);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
             return val;
           }
-          decay(counterOffset, counterIndex + 1, minCounterIndex);
+          decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }

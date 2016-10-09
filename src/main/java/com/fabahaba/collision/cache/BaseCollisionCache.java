@@ -116,9 +116,32 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
     }
   }
 
+  /**
+   * Checks for an existing entry synchronized behind the current collision hash bucket using
+   * acquire memory access semantics.  If an entry does not exist, a value is loaded and the
+   * behavior will be in line with the method {@link #decayAndSwap decayAndSwap}
+   *
+   * @param counterOffset beginning counter array index corresponding to collision values.
+   * @param collisions    values sitting in a hash bucket.
+   * @param key           used for table hash and entry equality.
+   * @param loadAndMap    loads a new value to cache if missing.
+   * @return a value for the corresponding key.
+   */
   abstract V checkDecayAndSwap(final int counterOffset, final V[] collisions,
       final K key, final Function<K, V> loadAndMap);
 
+  /**
+   * Checks for an existing entry synchronized behind the current collision hash bucket using
+   * acquire memory access semantics.  The minimum count for each entry is proactively tracked for
+   * swapping.  If an entry does not exist, a value is loaded and the behavior will be in line with
+   * the method {@link #decayAndSwap decayAndSwap}
+   *
+   * @param counterOffset beginning counter array index corresponding to collision values.
+   * @param collisions    values sitting in a hash bucket.
+   * @param key           used for table hash and entry equality.
+   * @param loadAndMap    loads a new value to cache if missing.
+   * @return a value for the corresponding key.
+   */
   abstract V checkDecayAndProbSwap(final int counterOffset, final V[] collisions,
       final K key, final Function<K, V> loadAndMap);
 
@@ -132,8 +155,8 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * @param collisions      values sitting in a hash bucket.
    * @param val             The value to put in place of the least frequently used value.
    */
-  final void decayAndSwap(final int counterOffset, final int maxCounterIndex,
-      final V[] collisions, final V val) {
+  final void decayAndSwap(final int counterOffset, final int maxCounterIndex, final V[] collisions,
+      final V val) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
     int minCount = 0xff;
@@ -215,8 +238,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
     if (val == null) {
       throw new NullPointerException("Cannot cache a null val.");
     }
-    final int hash = hashCoder.applyAsInt(key) & mask;
-    final V[] collisions = getCreateCollisions(hash);
+    final V[] collisions = getCreateCollisions(hashCoder.applyAsInt(key) & mask);
     int index = 0;
     do {
       final V collision = (V) OA.getAcquire(collisions, index);

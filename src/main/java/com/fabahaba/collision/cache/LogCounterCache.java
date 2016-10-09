@@ -44,8 +44,8 @@ abstract class LogCounterCache {
         return;
       }
     }
-    final double rand = 1.0 / ThreadLocalRandom.current().nextDouble();
-    if (rand < (count - initCount) << pow2LogFactor) {
+    final double prob = 1.0 / ThreadLocalRandom.current().nextDouble();
+    if (prob < (count - initCount) << pow2LogFactor) {
       return;
     }
     for (;;) {
@@ -55,7 +55,7 @@ abstract class LogCounterCache {
         return;
       }
       count = ((int) witness) & 0xff;
-      if (count == 0xff || (count > initCount && rand < (count - initCount) << pow2LogFactor)) {
+      if (count == 0xff || (count > initCount && prob < (count - initCount) << pow2LogFactor)) {
         return;
       }
     }

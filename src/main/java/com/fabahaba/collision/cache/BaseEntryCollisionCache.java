@@ -110,9 +110,32 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
     }
   }
 
+  /**
+   * Checks for an existing entry synchronized behind the current collision hash bucket using
+   * acquire memory access semantics.  If an entry does not exist, a value is loaded and the
+   * behavior will be in line with the method {@link #decayAndSwap decayAndSwap}
+   *
+   * @param counterOffset beginning counter array index corresponding to collision values.
+   * @param collisions    values sitting in a hash bucket.
+   * @param key           used for table hash and entry equality.
+   * @param loadAndMap    loads a new value to cache if missing.
+   * @return a value for the corresponding key.
+   */
   abstract V checkDecayAndSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
       final K key, final Function<K, V> loadAndMap);
 
+  /**
+   * Checks for an existing entry synchronized behind the current collision hash bucket using
+   * acquire memory access semantics.  The minimum count for each entry is proactively tracked for
+   * swapping.  If an entry does not exist, a value is loaded and the behavior will be in line with
+   * the method {@link #decayAndSwap decayAndSwap}
+   *
+   * @param counterOffset beginning counter array index corresponding to collision values.
+   * @param collisions    values sitting in a hash bucket.
+   * @param key           used for table hash and entry equality.
+   * @param loadAndMap    loads a new value to cache if missing.
+   * @return a value for the corresponding key.
+   */
   abstract V checkDecayAndProbSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
       final K key, final Function<K, V> loadAndMap);
 
@@ -206,8 +229,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
   @Override
   @SuppressWarnings("unchecked")
   public final V replace(final K key, final V val) {
-    final int hash = hashCoder.applyAsInt(key) & mask;
-    final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
+    final KeyVal<K, V>[] collisions = getCreateCollisions(hashCoder.applyAsInt(key) & mask);
     int index = 0;
     do {
       final KeyVal<K, V> entry = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -223,9 +245,8 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
         if (witness == entry) {
           return val;
         }
-        // If another thread raced to PUT, let it win.
         if (key.equals(witness.key)) {
-          return witness.val;
+          return witness.val; // If another thread raced to PUT, let it win.
         }
       }
     } while (++index < collisions.length);
