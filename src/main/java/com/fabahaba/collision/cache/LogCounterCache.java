@@ -42,19 +42,15 @@ abstract class LogCounterCache {
       }
       count = ((int) witness) & 0xff;
     }
-    for (final int prob = (int) (1.0 / ThreadLocalRandom.current().nextDouble()) >>> pow2LogFactor;
-         prob >= count;
-         count = ((int) witness) & 0xff) {
+    final int prob = (int) (1.0 / ThreadLocalRandom.current().nextDouble()) >>> pow2LogFactor;
+    while (prob >= count) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
       if (expected == witness || witness == MAX_COUNT) {
         return;
       }
+      count = ((int) witness) & 0xff;
     }
-  }
-
-  public static void main(String[] arg) {
-    System.out.println((byte) 0xFF);
   }
 
   /**
