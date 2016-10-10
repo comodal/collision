@@ -22,14 +22,14 @@ public class LogCounterTest {
     final int counterIndex = 3;
     counters.initCount(counterIndex);
 
-    double deltaPercentage = .25;
-    final double minDelta = 10;
+    double deltaPercentage = .15;
+    final double minDelta = 8;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0;;) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
       final int actual = counters.getAcquireCount(counterIndex);
-      System.out.println(expected + " <> " + actual);
-      final double delta = Math.max(minDelta, expected * deltaPercentage);
+      final double delta = minDelta + expected * deltaPercentage;
+      System.out.printf("%d <> %d +- %.1f%n", expected, actual, delta);
       assertEquals(expected, actual, delta);
       if (previousExpected == max) {
         break;

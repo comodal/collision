@@ -31,6 +31,9 @@ public final class KeyedCollisionBuilder<K, V> {
     this.delegate = delegate;
     this.hashCoder = hashCoder;
     this.isValForKey = isValForKey;
+    if (isValForKey != null) {
+      delegate.setStoreKeys(false);
+    }
   }
 
   static final class DefaultIsValForKey<K, V> implements BiPredicate<K, V> {
@@ -63,6 +66,11 @@ public final class KeyedCollisionBuilder<K, V> {
     return buildSparse(DEFAULT_SPARSE_FACTOR);
   }
 
+  /**
+   * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
+   *                     Defaults to a minimum of 1.0.
+   * @return A newly built {@link CollisionCache CollisionCache}.
+   */
   public CollisionCache<K, V> buildSparse(final double sparseFactor) {
     return buildSparse(sparseFactor, key -> null, null);
   }
@@ -88,19 +96,47 @@ public final class KeyedCollisionBuilder<K, V> {
     return delegate.getCapacity();
   }
 
+  /**
+   * Set the loader used to initialize values if missing from the cache.  The loader may return null
+   * values, the cache will simply return null as well.  The cache will provide methods to use the
+   * loader either atomically or not.
+   *
+   * @param loader returns values for a given key.
+   * @return {@link LoadingCollisionBuilder LoadingCollisionBuilder} to continue building process.
+   */
   public LoadingCollisionBuilder<K, V, V> setLoader(final Function<K, V> loader) {
     return setLoader(loader, (key, val) -> val);
   }
 
+  /**
+   * Set the loader and mapper used to initialize values if missing from the cache.  The loader may
+   * return null values, the cache will simply return null as well.  The cache will provide methods
+   * to use the loader either atomically or not.  The mapper is separated out to delay any final
+   * processing/parsing until it is absolutely needed.  The mapper will never be passed a null value
+   * and must not return a null value; cache performance could severely degrade.
+   *
+   * @param loader returns values for a given key.
+   * @param mapper map loaded types to value types.
+   * @param <L>    The intermediate type between loading and mapping.
+   * @return {@link LoadingCollisionBuilder LoadingCollisionBuilder} to continue building process.
+   */
   public <L> LoadingCollisionBuilder<K, L, V> setLoader(final Function<K, L> loader,
-      final BiFunction<K, L, V> finalizer) {
-    return new LoadingCollisionBuilder<>(this, loader, finalizer);
+      final BiFunction<K, L, V> mapper) {
+    return new LoadingCollisionBuilder<>(this, loader, mapper);
   }
 
   public ToIntFunction<K> getHashCoder() {
     return hashCoder == null ? new DefaultHashCoder<>() : hashCoder;
   }
 
+  /**
+   * The computed hash code is used to index the backing hash table of the cache.  Hash tables are
+   * always a length of some power of two.  The hash code will be masked against
+   * (hashTable.length - 1) to prevent index out of bounds exceptions.
+   *
+   * @param hashCoder computes an integer hash code for a given key.
+   * @return {@link KeyedCollisionBuilder KeyedCollisionBuilder} to continue building process.
+   */
   public KeyedCollisionBuilder<K, V> setHashCoder(final ToIntFunction<K> hashCoder) {
     this.hashCoder = hashCoder;
     return this;
@@ -110,6 +146,13 @@ public final class KeyedCollisionBuilder<K, V> {
     return isValForKey == null ? new DefaultIsValForKey<>() : isValForKey;
   }
 
+  /**
+   * Keys will not be stored if this predicate is provided.  This is the primary motivation of
+   * Collision.  The idea is allow for more cache capacity by not storing keys.
+   *
+   * @param isValForKey tests if a given value corresponds to the given key.
+   * @return {@link KeyedCollisionBuilder KeyedCollisionBuilder} to continue building process.
+   */
   public KeyedCollisionBuilder<K, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
     delegate.setStoreKeys(false);
     this.isValForKey = isValForKey;

@@ -24,6 +24,11 @@ public final class LoadingCollisionBuilder<K, L, V> {
     return buildSparse(DEFAULT_SPARSE_FACTOR);
   }
 
+  /**
+   * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
+   *                     Defaults to a minimum of 1.0.
+   * @return A newly built {@link LoadingCollisionCache LoadingCollisionCache}.
+   */
   public LoadingCollisionCache<K, L, V> buildSparse(final double sparseFactor) {
     return delegate.buildSparse(sparseFactor, loader, mapper);
   }
@@ -40,8 +45,32 @@ public final class LoadingCollisionBuilder<K, L, V> {
     return delegate.getHashCoder();
   }
 
+  /**
+   * The computed hash code is used to index the backing hash table of the cache.  Hash tables are
+   * always a length of some power of two.  The hash code will be masked against
+   * (hashTable.length - 1) to prevent index out of bounds exceptions.
+   *
+   * @param hashCoder computes an integer hash code for a given key.
+   * @return {@link LoadingCollisionBuilder KeyedCollisionBuilder} to continue building process.
+   */
   public LoadingCollisionBuilder<K, L, V> setHashCoder(final ToIntFunction<K> hashCoder) {
     delegate.setHashCoder(hashCoder);
+    return this;
+  }
+
+  public BiPredicate<K, V> getIsValForKey() {
+    return delegate.getIsValForKey();
+  }
+
+  /**
+   * Keys will not be stored if this predicate is provided.  This is the primary motivation of
+   * Collision.  The idea is allow for more cache capacity by not storing keys.
+   *
+   * @param isValForKey tests if a given value corresponds to the given key.
+   * @return {@link LoadingCollisionBuilder LoadingCollisionBuilder} to continue building process.
+   */
+  public LoadingCollisionBuilder<K, L, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
+    delegate.setIsValForKey(isValForKey);
     return this;
   }
 
@@ -96,15 +125,6 @@ public final class LoadingCollisionBuilder<K, L, V> {
 
   public LoadingCollisionBuilder<K, L, V> setLazyInitBuckets(final boolean lazyInitBuckets) {
     delegate.setLazyInitBuckets(lazyInitBuckets);
-    return this;
-  }
-
-  public BiPredicate<K, V> getIsValForKey() {
-    return delegate.getIsValForKey();
-  }
-
-  public LoadingCollisionBuilder<K, L, V> setIsValForKey(final BiPredicate<K, V> isValForKey) {
-    delegate.setIsValForKey(isValForKey);
     return this;
   }
 

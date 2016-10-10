@@ -12,7 +12,9 @@ public interface LoadingCollisionCache<K, L, V> extends CollisionCache<K, V> {
 
   /**
    * If a value already exists for the key it is returned, otherwise it is loaded and filled into a
-   * null space or swapped with the least frequently used for its hash bucket.
+   * null space or swapped with the least frequently used for its hash bucket.  Calls to the loader
+   * are NOT synchronized.  If the loader returns null, then null will be returned.  The registered
+   * mapper must not return null; cache performance could severely degrade.
    *
    * @param key    used for table hash and value equality.
    * @param loader creates values in the event of a cache miss.
