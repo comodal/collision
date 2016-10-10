@@ -25,8 +25,8 @@ import static com.fabahaba.collision.benchmarks.LoadStaticZipfBenchmark.SIZE;
 @Threads(32)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 10)
-@Measurement(iterations = 20)
+@Warmup(iterations = 1)
+@Measurement(iterations = 10)
 public class LoadMovingZipfBenchmark {
 
   @Param({

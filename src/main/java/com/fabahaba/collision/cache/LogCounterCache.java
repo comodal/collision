@@ -8,17 +8,16 @@ abstract class LogCounterCache {
 
   static final VarHandle BA = MethodHandles.arrayElementVarHandle(byte[].class);
   static final VarHandle OA = MethodHandles.arrayElementVarHandle(Object[].class);
+  private static final byte MAX_COUNT = (byte) 0xff;
 
   final byte[] counters;
   final byte initCount;
   private final int pow2LogFactor;
-  private final int initCountOffset;
 
   LogCounterCache(final byte[] counters, final int initCount, final int pow2LogFactor) {
     this.counters = counters;
     this.initCount = (byte) initCount;
     this.pow2LogFactor = pow2LogFactor;
-    this.initCountOffset = initCount << pow2LogFactor;
   }
 
   /**
@@ -26,38 +25,36 @@ abstract class LogCounterCache {
    * {@code initCount} to 255.  The probability of an increment decreases at a rate of
    * {@code (1 / (counters[index] * maxRelativeCount / (256^2 / 2)))}.
    *
-   * @param index Array index of the counter to increment.
+   * @param index counter array index to increment.
    */
   final void atomicIncrement(final int index) {
     byte witness = (byte) BA.getAcquire(counters, index);
-    int count = ((int) witness) & 0xff;
-    if (count == 0xff) {
+    if (witness == MAX_COUNT) {
       return;
     }
+    int count = ((int) witness) & 0xff;
     byte expected;
     while (count <= initCount) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-      if (expected == witness) {
+      if (expected == witness || witness == MAX_COUNT) {
         return;
       }
       count = ((int) witness) & 0xff;
-      if (count == 0xff) {
-        return;
-      }
     }
-    final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble()) >> pow2LogFactor);
-    while (prob >= count) {
+    for (final int prob = (int) (1.0 / ThreadLocalRandom.current().nextDouble()) >>> pow2LogFactor;
+         prob >= count;
+         count = ((int) witness) & 0xff) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-      if (expected == witness) {
-        return;
-      }
-      count = ((int) witness) & 0xff;
-      if (count == 0xff) {
+      if (expected == witness || witness == MAX_COUNT) {
         return;
       }
     }
+  }
+
+  public static void main(String[] arg) {
+    System.out.println((byte) 0xFF);
   }
 
   /**
@@ -88,7 +85,7 @@ abstract class LogCounterCache {
       if (counterIndex == skip) {
         continue;
       }
-      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      final int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
       if (count == 0) {
         continue;
       }

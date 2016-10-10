@@ -29,7 +29,7 @@ import java.util.stream.IntStream;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 10)
-@Measurement(iterations = 20)
+@Measurement(iterations = 10)
 public class LoadStaticZipfBenchmark {
 
   @Param({

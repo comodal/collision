@@ -20,6 +20,7 @@ public class LogCounterTest {
     final LogCounters counters = new LogCounters(numCounters, initCount, maxCounterVal);
     final int max = 255;
     final int counterIndex = 3;
+    counters.initCount(counterIndex);
 
     double deltaPercentage = .25;
     final double minDelta = 10;
@@ -54,6 +55,10 @@ public class LogCounterTest {
 
     LogCounters(final int numCounters, final int initCount, final int maxCounterVal) {
       super(new byte[numCounters], initCount, LogCounterCache.calcLogFactorShift(maxCounterVal));
+    }
+
+    void initCount(final int index) {
+      BA.setRelease(counters, index, initCount);
     }
 
     int getAcquireCount(final int index) {
