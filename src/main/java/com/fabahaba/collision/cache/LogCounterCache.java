@@ -46,9 +46,8 @@ abstract class LogCounterCache {
         return;
       }
     }
-    final double prob = initCountOffset + (1.0 / ThreadLocalRandom.current().nextDouble());
-    //while (prob >= count << pow2LogFactor) {
-    while ((int)prob >> pow2LogFactor >= count) {
+    final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble()) >> pow2LogFactor);
+    while (prob >= count) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {

@@ -11,16 +11,20 @@ public class LogCounterTest {
   @Test
   public void testCounters() {
     final int numCounters = 8;
-    final int initCount = 0;
-    final LogCounters counters = new LogCounters(numCounters, initCount, 1_048_576);
-
+    final int initCount = 3;
+    final int maxCounterVal = Integer.highestOneBit(1_048_576 - 1) << 1;
+    int expected = (int) ((((256 * 256) / 2.0) / maxCounterVal) * 100.0);
+    if (expected % 2 == 1) {
+      expected++;
+    }
+    final LogCounters counters = new LogCounters(numCounters, initCount, maxCounterVal);
     final int max = 255;
     final int counterIndex = 3;
 
     double deltaPercentage = .25;
     final double minDelta = 10;
 
-    for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0, expected = 4;;) {
+    for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0;;) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
       final int actual = counters.getAcquireCount(counterIndex);
       System.out.println(expected + " <> " + actual);
