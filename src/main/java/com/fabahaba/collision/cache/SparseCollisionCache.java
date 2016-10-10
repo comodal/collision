@@ -724,6 +724,50 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     return null;
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean remove(final K key) {
+    final int hash = hashCoder.applyAsInt(key) & mask;
+    final V[] collisions = getCreateCollisions(hash);
+    synchronized (collisions) {
+      int index = 0;
+      do {
+        V collision = (V) OA.getAcquire(collisions, index);
+        if (collision == null) {
+          return false;
+        }
+        if (isValForKey.test(key, collision)) {
+          size.getAndDecrement();
+          final int counterOffset = hash << maxCollisionsShift;
+          int counterIndex = counterOffset + index;
+          for (int nextIndex = index + 1;;++index, ++nextIndex) {
+            // Element at collisionIndex is a zero count known non-null that cannot be
+            // concurrently swapped, or a collision that has already been moved to the left.
+            OA.setRelease(collisions, index, null);
+            if (nextIndex == collisions.length) {
+              return true;
+            }
+            final Object next = OA.getAcquire(collisions, nextIndex);
+            if (next == null) {
+              return true;
+            }
+            // - Try to slide entries and their counters to the front.
+            // - If a new collision concurrently sneaks in, break out.
+            if (OA.compareAndExchangeRelease(collisions, index, null, next) != null) {
+              return true;
+            }
+            // Counter misses may occur during this transition.
+            final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
+            BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
+          }
+        }
+      } while (++index < collisions.length);
+    }
+    return false;
+  }
+
   @Override
   public String toString() {
     return "SparseCollisionCache{capacity=" + capacity

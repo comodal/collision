@@ -140,6 +140,14 @@ public interface CollisionCache<K, V> {
   V getIfPresentAcquire(final K key);
 
   /**
+   * Removes any entry for the corresponding key.
+   *
+   * @param key used for table hash and stored key/value equality.
+   * @return true if an entry was found.
+   */
+  boolean remove(final K key);
+
+  /**
    * Sets all hash table bucket slots to null.
    */
   void clear();
