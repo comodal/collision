@@ -12,11 +12,13 @@ abstract class LogCounterCache {
   final byte[] counters;
   final byte initCount;
   private final int pow2LogFactor;
+  private final int initCountOffset;
 
   LogCounterCache(final byte[] counters, final int initCount, final int pow2LogFactor) {
     this.counters = counters;
     this.initCount = (byte) initCount;
     this.pow2LogFactor = pow2LogFactor;
+    this.initCountOffset = initCount << pow2LogFactor;
   }
 
   /**
@@ -44,22 +46,38 @@ abstract class LogCounterCache {
         return;
       }
     }
-    final double prob = 1.0 / ThreadLocalRandom.current().nextDouble();
-    if (prob < (count - initCount) << pow2LogFactor) {
-      return;
-    }
-    for (;;) {
+    final double prob = initCountOffset + (1.0 / ThreadLocalRandom.current().nextDouble());
+    while (prob >= count << pow2LogFactor) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {
         return;
       }
       count = ((int) witness) & 0xff;
-      if (count == 0xff || (count > initCount && prob < (count - initCount) << pow2LogFactor)) {
+      if (count == 0xff) {
         return;
       }
     }
   }
+
+  //  public static void main(String[] args) {
+  //    final int initCount = 5;
+  //    final int pow2LogFactor = LogCounterCache.calcLogFactorShift(1_048_576);
+  //    final int initCountOffset = initCount << pow2LogFactor;
+  //    for (int count = 6;count < 255;) {
+  //      final double prob = 1.0 / ThreadLocalRandom.current().nextDouble();
+  //      boolean result = prob < (count - initCount) << pow2LogFactor;
+  //      final double testProb = prob + initCountOffset;
+  //      boolean result2 = testProb < count << pow2LogFactor;
+  //      if (result != result2) {
+  //        System.err.println(result + " : " + result2);
+  //      }
+  //      if (!result) {
+  //        ++count;
+  //        //System.out.println(result);
+  //      }
+  //    }
+  //  }
 
   /**
    * Used in conjunction with {@link #atomicIncrement atomicIncrement} as a multiplication
@@ -77,16 +95,16 @@ abstract class LogCounterCache {
   }
 
   /**
-   * Divides all values by two within the range [counterOffset, maxCounterIndex) except skipIndex.
+   * Divides all values by two within the ranges [from skip) and (skip, to).
    *
-   * @param counterOffset   inclusive counter index to start at.
-   * @param maxCounterIndex exclusive max index for the counters to decay.
-   * @param skipIndex       Skips decay for this entry because it is a brand new.
+   * @param from inclusive counter index to start at.
+   * @param to   exclusive max index for the counters to decay.
+   * @param skip Skips decay for this entry because it is a brand new.
    */
-  final void decay(final int counterOffset, final int maxCounterIndex, final int skipIndex) {
-    int counterIndex = counterOffset;
+  final void decay(final int from, final int to, final int skip) {
+    int counterIndex = from;
     do {
-      if (counterIndex == skipIndex) {
+      if (counterIndex == skip) {
         continue;
       }
       int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
@@ -95,6 +113,6 @@ abstract class LogCounterCache {
       }
       // Counter misses may occur between these two calls.
       BA.setRelease(counters, counterIndex, (byte) (count >> 1));
-    } while (++counterIndex < maxCounterIndex);
+    } while (++counterIndex < to);
   }
 }
