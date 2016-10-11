@@ -32,7 +32,7 @@ public class GetPutBenchmark {
              "Caffeine",
              "Collision"
          })
-  CacheFactory cacheType;
+  private CacheFactory cacheType;
   private GetPutCache<Long, Boolean> cache;
   private Long[] keys;
 
@@ -86,8 +86,6 @@ public class GetPutBenchmark {
     V get(final K key);
 
     V put(final K key, final V val);
-
-    void clear();
   }
 
   public enum CacheFactory {
@@ -113,11 +111,6 @@ public class GetPutBenchmark {
             cache.put(key, val);
             return val;
           }
-
-          @Override
-          public void clear() {
-            cache.clear();
-          }
         };
       }
     },
@@ -141,11 +134,6 @@ public class GetPutBenchmark {
             cache.put(key, val);
             return val;
           }
-
-          @Override
-          public void clear() {
-            cache.invalidateAll();
-          }
         };
       }
     },
@@ -166,11 +154,6 @@ public class GetPutBenchmark {
           @Override
           public V put(final K key, final V val) {
             return cache.putReplace(key, val);
-          }
-
-          @Override
-          public void clear() {
-            cache.clear();
           }
         };
       }

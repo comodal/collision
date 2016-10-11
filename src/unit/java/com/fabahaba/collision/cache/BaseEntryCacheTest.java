@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 
 abstract class BaseEntryCacheTest {
 
-  static final ThreadLocal<MessageDigest> sha3MessageDigest512 = ThreadLocal
+  private static final ThreadLocal<MessageDigest> sha3MessageDigest512 = ThreadLocal
       .withInitial(() -> {
         try {
           return MessageDigest.getInstance("SHA3-256");

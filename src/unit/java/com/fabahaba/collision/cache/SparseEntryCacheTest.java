@@ -8,9 +8,7 @@ public final class SparseEntryCacheTest extends BaseEntryCacheTest {
   public void before() {
     this.cache = CollisionCache
         .<String>withCapacity(64)
-        .<Integer, String>setLoader(
-            key -> hashInteger(key),
-            (key, hash) -> hash)
+        .setLoader(BaseEntryCacheTest::hashInteger, (key, hash) -> hash)
         .buildSparse();
   }
 }

@@ -13,7 +13,7 @@ import java.util.stream.IntStream;
  * @param <V> the type of mapped values
  * @author James P. Edwards
  */
-abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
+abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     implements LoadingCollisionCache<K, L, V> {
 
   private final Class<V> valueType;
@@ -159,14 +159,14 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
       final V val) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     do {
-      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         OA.setRelease(collisions, counterIndex - counterOffset, val);
         BA.setRelease(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+          count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
           if (count == 0) {
             continue;
           }

@@ -35,10 +35,10 @@ public class LoadMovingZipfBenchmark {
              "Collision",
              "Collision_Aggressive"
          })
-  LoadStaticZipfBenchmark.BenchmarkFunctionFactory cacheType;
-  Function<Long, Long> benchmarkFunction;
-  final Long[] keys = new Long[SIZE];
-  final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(ITEMS);
+  private LoadStaticZipfBenchmark.BenchmarkFunctionFactory cacheType;
+  private Function<Long, Long> benchmarkFunction;
+  private final Long[] keys = new Long[SIZE];
+  private final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(ITEMS);
 
   @Setup(Level.Iteration)
   public void setup() {

@@ -1,45 +1,54 @@
 package com.fabahaba.collision.cache;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-public class LogCounterTest {
+public class AtomicLogCountersTest {
+
+  private static final int numCounters = 8;
+  private static final int initCount = 3;
+  private static final int maxCounterVal = Integer.highestOneBit(1_048_576 - 1) << 1;
+  private AtomicLogCounters counters;
+
+  @Before
+  public void before() {
+    this.counters = new AtomicLogCounters(numCounters, initCount, maxCounterVal);
+  }
 
   @Test
   public void testCounters() {
-    final int numCounters = 8;
-    final int initCount = 3;
-    final int maxCounterVal = Integer.highestOneBit(1_048_576 - 1) << 1;
     int expected = (int) ((((256 * 256) / 2.0) / maxCounterVal) * 100.0);
     if (expected % 2 == 1) {
       expected++;
     }
-    final LogCounters counters = new LogCounters(numCounters, initCount, maxCounterVal);
-    final int max = 255;
+
     final int counterIndex = 3;
     counters.initCount(counterIndex);
 
-    double deltaPercentage = .15;
-    double minDelta = 10;
+    double deltaPercentage = .20;
+    double minDelta = 7;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0;;) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
       final int actual = counters.getAcquireCount(counterIndex);
       final double delta = minDelta + expected * deltaPercentage;
       System.out.printf("%d <> %d +- %.1f%n", expected, actual, delta);
+      assertTrue(actual >= previousExpected);
       assertEquals(expected, actual, delta);
-      if (previousExpected == max) {
+      if (previousExpected == AtomicLogCounters.MAX_COUNT) {
         break;
       }
       i = log;
       log <<= 1;
       final int nextExpected = expected + (toggle++ % 2 == 0 ? expected / 2 : previousExpected / 2);
       previousExpected = expected;
-      expected = Math.min(max, nextExpected);
-      if (previousExpected == max) {
+      expected = Math.min(AtomicLogCounters.MAX_COUNT, nextExpected);
+      if (previousExpected == AtomicLogCounters.MAX_COUNT) {
         minDelta = 0;
         deltaPercentage = 0.0;
       } else {
@@ -49,41 +58,34 @@ public class LogCounterTest {
 
     for (int i = 0;i < numCounters;++i) {
       if (i == counterIndex) {
-        assertEquals(max, counters.getAcquireCount(i));
+        assertEquals(AtomicLogCounters.MAX_COUNT, counters.getAcquireCount(i));
       } else {
         assertEquals(0, counters.getAcquireCount(i));
       }
-    }
-
-    counters.decay(0, numCounters, counterIndex);
-    for (int i = 0;i < numCounters;++i) {
-      if (i == counterIndex) {
-        assertEquals(max, counters.getAcquireCount(i));
-      } else {
-        assertEquals(0, counters.getAcquireCount(i));
-      }
-    }
-
-    for (int i = 0, decayed = max, iterations = Integer.numberOfTrailingZeros(256) + 1;
-         i < iterations;++i) {
-      counters.decay(counterIndex, counterIndex, -1);
-      decayed /= 2;
-      assertEquals(decayed, counters.getAcquireCount(counterIndex));
     }
   }
 
-  static final class LogCounters extends LogCounterCache {
-
-    LogCounters(final int numCounters, final int initCount, final int maxCounterVal) {
-      super(new byte[numCounters], initCount, LogCounterCache.calcLogFactorShift(maxCounterVal));
+  @Test
+  public void testDecay() {
+    int initCount = 2;
+    for (int i = 0;i < numCounters;++i) {
+      counters.initCount(i, initCount);
+      assertEquals(initCount, counters.getAcquireCount(i));
+      initCount = Math.min(AtomicLogCounters.MAX_COUNT, initCount << 1);
     }
 
-    void initCount(final int index) {
-      BA.setRelease(counters, index, initCount);
+    for (int i = 0,
+         counterIndex = 7,
+         decayed = AtomicLogCounters.MAX_COUNT,
+         iterations = Integer.numberOfTrailingZeros(256) + 1;
+         i < iterations;++i) {
+      counters.decay(0, numCounters, -1);
+      decayed /= 2;
+      assertEquals(decayed, counters.getAcquireCount(counterIndex));
     }
 
-    int getAcquireCount(final int index) {
-      return ((int) BA.getAcquire(counters, index)) & 0xff;
+    for (int i = 0;i < numCounters;++i) {
+      assertEquals(0, counters.getAcquireCount(i));
     }
   }
 }

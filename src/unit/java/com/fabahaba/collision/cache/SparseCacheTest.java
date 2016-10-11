@@ -2,16 +2,16 @@ package com.fabahaba.collision.cache;
 
 import org.junit.Before;
 
-public final class SparseCollisionCacheTest extends BaseCollisionCacheTest {
+public final class SparseCacheTest extends BaseCacheTest {
 
   @Before
   public void before() {
     this.maxCollisions = 4;
     this.cache = CollisionCache
-        .withCapacity(32, Integer.class)
+        .withCapacity(32, TestNumber.class)
         .setBucketSize(maxCollisions)
         .setStoreKeys(false)
-        .<Integer, Integer>setLoader(num -> num, (key, num) -> num)
+        .<TestNumber, TestNumber>setLoader(num -> num, (key, num) -> num)
         .buildSparse();
   }
 }

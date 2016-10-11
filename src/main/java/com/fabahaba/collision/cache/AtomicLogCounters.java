@@ -5,22 +5,41 @@ import java.lang.invoke.VarHandle;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
+ * Provides atomic operations for 8-bit logarithmic counters backed by a byte array.
+ *
  * @author James P. Edwards
  */
-abstract class LogCounterCache {
+class AtomicLogCounters {
 
   static final VarHandle BA = MethodHandles.arrayElementVarHandle(byte[].class);
   static final VarHandle OA = MethodHandles.arrayElementVarHandle(Object[].class);
-  private static final byte MAX_COUNT = (byte) 0xff;
+
+  static final int MAX_COUNT = 0xff;
 
   final byte[] counters;
   final byte initCount;
   private final int pow2LogFactor;
 
-  LogCounterCache(final byte[] counters, final int initCount, final int pow2LogFactor) {
+  AtomicLogCounters(final int numCounters, final int initCount, final int maxCounterVal) {
+    this(new byte[numCounters], initCount, calcLogFactorShift(maxCounterVal));
+  }
+
+  AtomicLogCounters(final byte[] counters, final int initCount, final int pow2LogFactor) {
     this.counters = counters;
     this.initCount = (byte) initCount;
     this.pow2LogFactor = pow2LogFactor;
+  }
+
+  final void initCount(final int index) {
+    BA.setRelease(counters, index, initCount);
+  }
+
+  final void initCount(final int index, final int initCount) {
+    BA.setRelease(counters, index, (byte) initCount);
+  }
+
+  final int getAcquireCount(final int index) {
+    return ((int) BA.getAcquire(counters, index)) & MAX_COUNT;
   }
 
   /**
@@ -32,27 +51,33 @@ abstract class LogCounterCache {
    */
   final void atomicIncrement(final int index) {
     byte witness = (byte) BA.getAcquire(counters, index);
-    if (witness == MAX_COUNT) {
+    int count = ((int) witness) & MAX_COUNT;
+    if (count == MAX_COUNT) {
       return;
     }
-    int count = ((int) witness) & 0xff;
     byte expected;
     while (count <= initCount) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-      if (expected == witness || witness == MAX_COUNT) {
+      if (expected == witness) {
         return;
       }
-      count = ((int) witness) & 0xff;
+      count = ((int) witness) & MAX_COUNT;
+      if (count == MAX_COUNT) {
+        return;
+      }
     }
-    final int prob = (int) (1.0 / ThreadLocalRandom.current().nextDouble()) >>> pow2LogFactor;
+    final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble())) >>> pow2LogFactor;
     while (prob >= count) {
       expected = witness;
       witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
-      if (expected == witness || witness == MAX_COUNT) {
+      if (expected == witness) {
         return;
       }
-      count = ((int) witness) & 0xff;
+      count = ((int) witness) & MAX_COUNT;
+      if (count == MAX_COUNT) {
+        return;
+      }
     }
   }
 
@@ -84,7 +109,7 @@ abstract class LogCounterCache {
       if (counterIndex == skip) {
         continue;
       }
-      final int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      final int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         continue;
       }

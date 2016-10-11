@@ -38,9 +38,9 @@ public class LoadStaticZipfBenchmark {
              "Collision",
              "Collision_Aggressive"
          })
-  BenchmarkFunctionFactory cacheType;
-  Function<Long, Long> benchmarkFunction;
-  Long[] keys = new Long[SIZE];
+  private BenchmarkFunctionFactory cacheType;
+  private Function<Long, Long> benchmarkFunction;
+  private Long[] keys = new Long[SIZE];
 
   @State(Scope.Thread)
   public static class ThreadState {
@@ -50,7 +50,7 @@ public class LoadStaticZipfBenchmark {
 
   static final int SIZE = 1 << 20;
   static final int MASK = SIZE - 1;
-  static final int CAPACITY = 1 << 17;
+  private static final int CAPACITY = 1 << 17;
   static final int ITEMS = SIZE / 3;
 
   @Setup

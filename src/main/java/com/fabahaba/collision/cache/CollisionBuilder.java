@@ -60,7 +60,7 @@ public final class CollisionBuilder<V> {
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
     final byte[] counters = new byte[Integer
         .highestOneBit((int) (capacity * Math.max(1.0, sparseFactor)) - 1) << 1];
-    final int pow2LogFactor = LogCounterCache.calcLogFactorShift(maxCounterVal);
+    final int pow2LogFactor = AtomicLogCounters.calcLogFactorShift(maxCounterVal);
     final int hashTableLength = counters.length >> maxCollisionsShift;
     if (isStoreKeys()) {
       final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
@@ -104,7 +104,7 @@ public final class CollisionBuilder<V> {
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
     final byte[] counters = new byte[Integer.highestOneBit(capacity - 1) << 1];
-    final int pow2LogFactor = LogCounterCache.calcLogFactorShift(maxCounterVal);
+    final int pow2LogFactor = AtomicLogCounters.calcLogFactorShift(maxCounterVal);
     final int hashTableLength = counters.length >> maxCollisionsShift;
     if (isStoreKeys()) {
       final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);

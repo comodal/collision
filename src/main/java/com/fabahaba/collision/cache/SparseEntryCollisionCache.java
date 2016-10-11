@@ -96,7 +96,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -127,7 +127,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -154,7 +154,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -183,7 +183,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -281,7 +281,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -325,7 +325,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -356,7 +356,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       if (counterIndex == skipIndex) {
         continue;
       }
-      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         if (counterIndex < skipIndex) {
           continue;
@@ -380,7 +380,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
             return;
           }
           // Counter misses may occur during this transition.
-          count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
+          count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
           BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
         }
       }
@@ -393,14 +393,14 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       final KeyVal<K, V>[] collisions, final KeyVal<K, V> entry) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     do {
-      int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         OA.setRelease(collisions, counterIndex - counterOffset, entry);
         BA.setRelease(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+          count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
           if (count > 0) {
             BA.setRelease(counters, counterIndex, (byte) (count >> 1));
             continue;
@@ -424,7 +424,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
               return;
             }
             // - Counter misses may occur during this transition.
-            count = ((int) BA.getAcquire(counters, counterIndex + 1)) & 0xff;
+            count = ((int) BA.getAcquire(counters, counterIndex + 1)) & MAX_COUNT;
             BA.setRelease(counters, counterIndex++, (byte) (count >> 1));
           }
         }
@@ -500,7 +500,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int counterOffset = hash << maxCollisionsShift;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;++counterIndex) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -544,7 +544,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -611,7 +611,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int counterOffset = hash << maxCollisionsShift;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
@@ -641,7 +641,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -756,6 +756,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    * {@inheritDoc}
    */
   @Override
+  @SuppressWarnings("unchecked")
   public boolean remove(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
@@ -787,7 +788,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
               return true;
             }
             // Counter misses may occur during this transition.
-            final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
+            final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
             BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
           }
         }
@@ -800,6 +801,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    * {@inheritDoc}
    */
   @Override
+  @SuppressWarnings("unchecked")
   public void clear() {
     synchronized (hashTable) {
       IntStream.range(0, hashTable.length).parallel().forEach(i -> {
@@ -809,8 +811,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         }
         int index = 0;
         do {
-          final KeyVal<K, V> collision = (KeyVal<K, V>) OA
-              .getAndSetRelease(collisions, index, null);
+          final Object collision = OA.getAndSetRelease(collisions, index, null);
           if (collision != null) {
             size.getAndDecrement();
           }
@@ -823,6 +824,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
    * {@inheritDoc}
    */
   @Override
+  @SuppressWarnings("unchecked")
   public void nullBuckets() {
     synchronized (hashTable) {
       IntStream.range(0, hashTable.length).parallel().forEach(i -> {
@@ -832,8 +834,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         }
         int index = 0;
         do {
-          final KeyVal<K, V> collision = (KeyVal<K, V>) OA
-              .getAndSetRelease(collisions, index, null);
+          final Object collision = OA.getAndSetRelease(collisions, index, null);
           if (collision != null) {
             size.getAndDecrement();
           }

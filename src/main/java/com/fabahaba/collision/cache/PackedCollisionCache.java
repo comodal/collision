@@ -69,7 +69,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
@@ -97,7 +97,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           return collision;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -122,7 +122,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
@@ -151,7 +151,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           return collision;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -224,7 +224,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     int index = 0;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         V collision = (V) OA.getAcquire(collisions, index);
@@ -255,7 +255,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           return collision;
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -320,7 +320,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     final int counterOffset = hash << maxCollisionsShift;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         final V collision = (V) OA.getAcquire(collisions, index);
@@ -337,7 +337,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           }
         }
 
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -389,14 +389,14 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
     final int counterOffset = hash << maxCollisionsShift;
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
-    int minCount = 0xff;
+    int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (;;) {
         final V collision = (V) OA.getAcquire(collisions, index);
         if (isValForKey.test(key, collision)) {
           return collision;
         }
-        int count = ((int) BA.getAcquire(counters, counterIndex)) & 0xff;
+        int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -493,6 +493,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
    * {@inheritDoc}
    */
   @Override
+  @SuppressWarnings("unchecked")
   public boolean remove(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
@@ -523,7 +524,7 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
               return true;
             }
             // Counter misses may occur during this transition.
-            final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & 0xff;
+            final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
             BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
           }
         }
