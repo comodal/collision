@@ -16,7 +16,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
     implements LoadingCollisionCache<K, L, V> {
 
   final int maxCollisionsShift;
-  private final KeyVal<K, V>[][] hashTable;
+  final KeyVal<K, V>[][] hashTable;
   final int mask;
   final ToIntFunction<K> hashCoder;
   private final Function<K, L> loader;
@@ -257,7 +257,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public final void clear() {
+  public void clear() {
     IntStream.range(0, hashTable.length)
         .parallel()
         .forEach(i -> {
@@ -276,7 +276,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public final void nullBuckets() {
+  public void nullBuckets() {
     IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);
   }
 

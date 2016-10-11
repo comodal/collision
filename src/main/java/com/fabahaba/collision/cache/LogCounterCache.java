@@ -4,6 +4,9 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * @author James P. Edwards
+ */
 abstract class LogCounterCache {
 
   static final VarHandle BA = MethodHandles.arrayElementVarHandle(byte[].class);

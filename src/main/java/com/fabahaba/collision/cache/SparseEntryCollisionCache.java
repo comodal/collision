@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
 
 /**
  * @param <K> the type of keys used to map to values
@@ -770,8 +771,8 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
           for (int nextIndex = index + 1;;++index, ++nextIndex) {
-            // Element at collisionIndex is a zero count known non-null that cannot be
-            // concurrently swapped, or a collision that has already been moved to the left.
+            // Element at index is a zero count known non-null that cannot be concurrently swapped,
+            // or a collision that has already been moved to the left.
             OA.setRelease(collisions, index, null);
             if (nextIndex == collisions.length) {
               return true;
@@ -793,6 +794,52 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       } while (++index < collisions.length);
     }
     return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void clear() {
+    synchronized (hashTable) {
+      IntStream.range(0, hashTable.length).parallel().forEach(i -> {
+        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) OA.getAcquire(hashTable, i);
+        if (collisions == null) {
+          return;
+        }
+        int index = 0;
+        do {
+          final KeyVal<K, V> collision = (KeyVal<K, V>) OA
+              .getAndSetRelease(collisions, index, null);
+          if (collision != null) {
+            size.getAndDecrement();
+          }
+        } while (++index < collisions.length);
+      });
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void nullBuckets() {
+    synchronized (hashTable) {
+      IntStream.range(0, hashTable.length).parallel().forEach(i -> {
+        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) OA.getAndSetRelease(hashTable, i, null);
+        if (collisions == null) {
+          return;
+        }
+        int index = 0;
+        do {
+          final KeyVal<K, V> collision = (KeyVal<K, V>) OA
+              .getAndSetRelease(collisions, index, null);
+          if (collision != null) {
+            size.getAndDecrement();
+          }
+        } while (++index < collisions.length);
+      });
+    }
   }
 
   @Override

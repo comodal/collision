@@ -23,7 +23,7 @@ public class LogCounterTest {
     counters.initCount(counterIndex);
 
     double deltaPercentage = .15;
-    final double minDelta = 8;
+    double minDelta = 10;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0;;) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
@@ -39,7 +39,12 @@ public class LogCounterTest {
       final int nextExpected = expected + (toggle++ % 2 == 0 ? expected / 2 : previousExpected / 2);
       previousExpected = expected;
       expected = Math.min(max, nextExpected);
-      deltaPercentage -= .01;
+      if (previousExpected == max) {
+        minDelta = 0;
+        deltaPercentage = 0.0;
+      } else {
+        deltaPercentage -= .01;
+      }
     }
 
     for (int i = 0;i < numCounters;++i) {
@@ -48,6 +53,22 @@ public class LogCounterTest {
       } else {
         assertEquals(0, counters.getAcquireCount(i));
       }
+    }
+
+    counters.decay(0, numCounters, counterIndex);
+    for (int i = 0;i < numCounters;++i) {
+      if (i == counterIndex) {
+        assertEquals(max, counters.getAcquireCount(i));
+      } else {
+        assertEquals(0, counters.getAcquireCount(i));
+      }
+    }
+
+    for (int i = 0, decayed = max, iterations = Integer.numberOfTrailingZeros(256) + 1;
+         i < iterations;++i) {
+      counters.decay(counterIndex, counterIndex, -1);
+      decayed /= 2;
+      assertEquals(decayed, counters.getAcquireCount(counterIndex));
     }
   }
 

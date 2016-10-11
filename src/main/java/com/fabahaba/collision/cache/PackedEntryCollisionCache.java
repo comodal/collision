@@ -527,8 +527,8 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
           for (int nextIndex = index + 1;;++index, ++nextIndex) {
-            // Element at collisionIndex is a zero count known non-null that cannot be
-            // concurrently swapped, or a collision that has already been moved to the left.
+            // Element at index is a zero count known non-null that cannot be concurrently swapped,
+            // or a collision that has already been moved to the left.
             OA.setRelease(collisions, index, null);
             if (nextIndex == collisions.length) {
               return true;

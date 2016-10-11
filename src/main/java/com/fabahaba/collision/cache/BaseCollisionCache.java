@@ -18,7 +18,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
 
   private final Class<V> valueType;
   final int maxCollisionsShift;
-  private final V[][] hashTable;
+  final V[][] hashTable;
   final int mask;
   final ToIntFunction<K> hashCoder;
   final BiPredicate<K, V> isValForKey;
@@ -265,7 +265,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public final void clear() {
+  public void clear() {
     IntStream.range(0, hashTable.length)
         .parallel()
         .forEach(i -> {
@@ -284,7 +284,7 @@ abstract class BaseCollisionCache<K, L, V> extends LogCounterCache
    * {@inheritDoc}
    */
   @Override
-  public final void nullBuckets() {
+  public void nullBuckets() {
     IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);
   }
 

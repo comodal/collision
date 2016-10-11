@@ -29,7 +29,7 @@ public final class CollisionBuilder<V> {
    * Increase to reduce collisions.
    * If increasing consider lazyInitBuckets to prevent unnecessary array creation.
    */
-  static final double DEFAULT_SPARSE_FACTOR = 2.0;
+  static final double DEFAULT_SPARSE_FACTOR = 3.0;
 
   public <K> CollisionCache<K, V> buildSparse() {
     return buildSparse(DEFAULT_SPARSE_FACTOR);
@@ -37,7 +37,7 @@ public final class CollisionBuilder<V> {
 
   /**
    * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
-   *                     Defaults to a minimum of 1.0.
+   *                     Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link CollisionCache CollisionCache}.
    */
   public <K> CollisionCache<K, V> buildSparse(final double sparseFactor) {

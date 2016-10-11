@@ -5,6 +5,7 @@ import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
 
 /**
  * @param <K> the type of keys used to map to values
@@ -743,8 +744,8 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
           for (int nextIndex = index + 1;;++index, ++nextIndex) {
-            // Element at collisionIndex is a zero count known non-null that cannot be
-            // concurrently swapped, or a collision that has already been moved to the left.
+            // Element at index is a zero count known non-null that cannot be concurrently swapped,
+            // or a collision that has already been moved to the left.
             OA.setRelease(collisions, index, null);
             if (nextIndex == collisions.length) {
               return true;
@@ -766,6 +767,50 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
       } while (++index < collisions.length);
     }
     return false;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void clear() {
+    synchronized (hashTable) {
+      IntStream.range(0, hashTable.length).parallel().forEach(i -> {
+        final V[] collisions = (V[]) OA.getAcquire(hashTable, i);
+        if (collisions == null) {
+          return;
+        }
+        int index = 0;
+        do {
+          final V collision = (V) OA.getAndSetRelease(collisions, index, null);
+          if (collision != null) {
+            size.getAndDecrement();
+          }
+        } while (++index < collisions.length);
+      });
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void nullBuckets() {
+    synchronized (hashTable) {
+      IntStream.range(0, hashTable.length).parallel().forEach(i -> {
+        final V[] collisions = (V[]) OA.getAndSetRelease(hashTable, i, null);
+        if (collisions == null) {
+          return;
+        }
+        int index = 0;
+        do {
+          final V collision = (V) OA.getAndSetRelease(collisions, index, null);
+          if (collision != null) {
+            size.getAndDecrement();
+          }
+        } while (++index < collisions.length);
+      });
+    }
   }
 
   @Override

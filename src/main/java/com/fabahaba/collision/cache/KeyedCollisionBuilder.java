@@ -68,7 +68,7 @@ public final class KeyedCollisionBuilder<K, V> {
 
   /**
    * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
-   *                     Defaults to a minimum of 1.0.
+   *                     Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link CollisionCache CollisionCache}.
    */
   public CollisionCache<K, V> buildSparse(final double sparseFactor) {
