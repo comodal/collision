@@ -19,7 +19,7 @@ CollisionCache<Key, Value> cache = CollisionCache
 * Uses CAS atomic operations as much as possible to optimize for concurrent access.  Specifically, Java 9 acquire/release semantics exposed through VarHandles.
 * Optional user supplied `int hashCode(K key)` function.
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
-* Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/LogCounterCache.java#L33) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
+* Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/AtomicLogCounters.java#L52) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
 * Atomic or aggressive loading of missing values.
 
 ###Benchmarks
