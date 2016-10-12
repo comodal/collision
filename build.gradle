@@ -22,14 +22,14 @@ scmVersion {
   releaseCommitMessage { version, position -> "Release $project.name-$version" }
 
   checks {
-    uncommittedChanges = false
+    uncommittedChanges = true
   }
 }
 
 project.group = 'com.fabahaba'
 project.version = scmVersion.version
 
-sourceCompatibility = 9
+sourceCompatibility = JavaVersion.VERSION_1_9
 
 repositories {
   maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
@@ -69,7 +69,6 @@ test {
     exclude project.excludeTests
   }
   maxParallelForks = 2
-  exclude '**testCounters**'
   testLogging {
     events "passed", "skipped", "failed", "standardOut", "standardError"
   }
@@ -131,6 +130,7 @@ bintray {
 
 bintrayUpload.onlyIf { !project.version.endsWith('SNAPSHOT') }
 
+// does not support Java 9 yet.
 //findbugs {
 //  toolVersion = "+"
 //  reportsDir = file("$project.buildDir/findbugsReports")

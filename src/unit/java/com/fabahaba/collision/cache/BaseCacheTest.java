@@ -3,6 +3,7 @@ package com.fabahaba.collision.cache;
 import org.junit.After;
 import org.junit.Test;
 
+import static com.fabahaba.collision.cache.BaseCacheTest.TestNumber.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -23,7 +24,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testPutGetExisting() {
-    final TestNumber key = TestNumber.of(Integer.MAX_VALUE);
+    final TestNumber key = of(Integer.MAX_VALUE);
     assertNull(cache.getIfPresent(key));
     assertSame(key, cache.putIfAbsent(key, key));
     assertSame(key, cache.putIfAbsent(key, key));
@@ -35,31 +36,31 @@ abstract class BaseCacheTest {
 
   @Test
   public void testIfSpace() {
-    final TestNumber key = TestNumber.of(9);
+    final TestNumber key = of(9);
     int val = 0;
     for (;val < maxCollisions;++val) {
-      final TestNumber boxed = TestNumber.of(val);
+      final TestNumber boxed = of(val);
       assertEquals(val, cache.putIfSpaceAbsent(key, boxed).val);
     }
     assertNull(cache.putIfSpaceAbsent(key, key));
     assertNull(cache.putIfSpaceReplace(key, key));
     assertSame(key, cache.putIfAbsent(key, key));
-    assertEquals(key, cache.putIfSpaceReplace(key, TestNumber.of(key.val)));
-    final TestNumber newKey = TestNumber.of(val);
+    assertEquals(key, cache.putIfSpaceReplace(key, of(key.val)));
+    final TestNumber newKey = of(val);
     assertNotSame(key, newKey);
     assertSame(newKey, cache.replace(key, newKey));
     assertSame(key, cache.putIfAbsent(key, key));
-    assertSame(key, cache.putIfAbsent(key, TestNumber.of(42)));
-    assertSame(key, cache.putIfSpaceAbsent(key, TestNumber.of(27)));
-    assertEquals(TestNumber.of(27), cache.putIfSpaceReplace(key, TestNumber.of(27)));
-    assertEquals(TestNumber.of(42), cache.putReplace(key, TestNumber.of(42)));
+    assertSame(key, cache.putIfAbsent(key, of(42)));
+    assertSame(key, cache.putIfSpaceAbsent(key, of(27)));
+    assertEquals(of(27), cache.putIfSpaceReplace(key, of(27)));
+    assertEquals(of(42), cache.putReplace(key, of(42)));
   }
 
   @Test
   public void testReplace() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
-      final TestNumber newBoxedKey = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
+      final TestNumber newBoxedKey = of(key);
       assertNotSame(boxedKey, newBoxedKey);
       assertEquals(boxedKey, newBoxedKey);
 
@@ -91,9 +92,9 @@ abstract class BaseCacheTest {
   @Test
   public void testLoadAggressive() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
-      final TestNumber loaded = cache.getAggressive(TestNumber.of(key));
+      final TestNumber loaded = cache.getAggressive(of(key));
       assertEquals(boxedKey, loaded);
       assertNotSame(boxedKey, loaded);
       assertEquals(boxedKey, cache.getIfPresent(boxedKey));
@@ -105,9 +106,9 @@ abstract class BaseCacheTest {
   @Test
   public void testLoad() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresentAcquire(boxedKey));
-      final TestNumber loaded = cache.get(TestNumber.of(key));
+      final TestNumber loaded = cache.get(of(key));
       assertEquals(boxedKey, loaded);
       assertNotSame(boxedKey, loaded);
       assertEquals(boxedKey, cache.getIfPresentAcquire(boxedKey));
@@ -119,8 +120,8 @@ abstract class BaseCacheTest {
   @Test
   public void testGetIfPresentAcquire() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
-      final TestNumber expected = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
+      final TestNumber expected = of(key);
       assertNull(cache.getIfPresentAcquire(boxedKey));
       assertSame(expected, cache.putIfAbsent(boxedKey, expected));
       assertSame(expected, cache.getIfPresentAcquire(boxedKey));
@@ -132,8 +133,8 @@ abstract class BaseCacheTest {
   @Test
   public void testPutIfAbsent() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
-      final TestNumber expected = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
+      final TestNumber expected = of(key);
       assertSame(expected, cache.putIfAbsent(boxedKey, expected));
       assertSame(expected, cache.putIfAbsent(boxedKey, expected));
     }
@@ -142,14 +143,14 @@ abstract class BaseCacheTest {
   @Test
   public void testNullBuckets() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
-      final TestNumber expected = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
+      final TestNumber expected = of(key);
       cache.putIfAbsent(boxedKey, expected);
       assertSame(expected, cache.getIfPresent(boxedKey));
     }
     cache.nullBuckets();
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
     }
   }
@@ -157,14 +158,14 @@ abstract class BaseCacheTest {
   @Test
   public void testClear() {
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
-      final TestNumber expected = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
+      final TestNumber expected = of(key);
       cache.putReplace(boxedKey, expected);
       assertSame(expected, cache.getIfPresentAcquire(boxedKey));
     }
     cache.clear();
     for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
-      final TestNumber boxedKey = TestNumber.of(key);
+      final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
     }
   }

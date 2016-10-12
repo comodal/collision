@@ -25,9 +25,12 @@ abstract class BaseEntryCacheTest {
         }
       });
 
-  static String hashInteger(final Integer integer) {
+  static byte[] hashInteger(final Integer integer) {
     final byte[] intStringBytes = integer.toString().getBytes(StandardCharsets.US_ASCII);
-    final byte[] hashBytes = sha3MessageDigest512.get().digest(intStringBytes);
+    return sha3MessageDigest512.get().digest(intStringBytes);
+  }
+
+  static String toHexString(final byte[] hashBytes) {
     return new BigInteger(1, hashBytes).toString(16);
   }
 
@@ -35,11 +38,11 @@ abstract class BaseEntryCacheTest {
 
   static {
     for (int i = 0;i < expectedHashes.length;i++) {
-      expectedHashes[i] = hashInteger(i);
+      expectedHashes[i] = toHexString(hashInteger(i));
     }
   }
 
-  CollisionCache<Integer, String> cache;
+  LoadingCollisionCache<Integer, byte[], String> cache;
 
   @After
   public void after() {
@@ -111,7 +114,7 @@ abstract class BaseEntryCacheTest {
   public void testReplace() {
     for (int key = 0;key < expectedHashes.length;key++) {
       final String expected = expectedHashes[key];
-      final String newHash = hashInteger(key);
+      final String newHash = toHexString(hashInteger(key));
       assertNotSame(expected, newHash);
       assertEquals(expected, newHash);
 

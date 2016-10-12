@@ -361,7 +361,10 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
             BA.setRelease(counters, counterIndex, (byte) (count >> 1));
             continue;
           }
-          size.getAndDecrement();
+          if (size.getAndDecrement() <= capacity) {
+            size.getAndIncrement();
+            continue;
+          }
           for (int collisionIndex = counterIndex - counterOffset,
                nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
             // Element at collisionIndex is a zero count known non-null that cannot be
@@ -612,7 +615,10 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
         if (counterIndex < skipIndex) {
           continue;
         }
-        size.getAndDecrement();
+        if (size.getAndDecrement() <= capacity) {
+          size.getAndIncrement();
+          continue;
+        }
         for (int collisionIndex = counterIndex - counterOffset,
              nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
           // Element at collisionIndex is a zero count known non-null that cannot be
