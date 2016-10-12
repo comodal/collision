@@ -349,8 +349,8 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     }
   }
 
-  private void decayAndDrop(final int counterOffset, final int maxCounterIndex, final int skipIndex,
-      final KeyVal[] collisions) {
+  private void decayAndDrop(final int counterOffset, final int maxCounterIndex,
+      final int skipIndex, final KeyVal[] collisions) {
     int counterIndex = counterOffset;
     do {
       if (counterIndex == skipIndex) {
@@ -367,20 +367,20 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         }
         for (int collisionIndex = counterIndex - counterOffset,
              nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
-          // Element at collisionIndex is a zero count known non-null that cannot be
-          // concurrently swapped, or a collision that has already been moved to the left.
-          OA.setRelease(collisions, collisionIndex, null);
           if (nextCollisionIndex == collisions.length) {
+            OA.setRelease(collisions, collisionIndex, null);
             return;
           }
-          final Object next = OA.getAcquire(collisions, nextCollisionIndex);
+          Object next = OA.getAcquire(collisions, nextCollisionIndex);
           if (next == null) {
-            return;
-          }
-          // - Try to slide new data and its counter to the front.
-          // - If a new collision concurrently sneaks in, break out.
-          if (OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
-            return;
+            OA.setRelease(collisions, collisionIndex, null);
+            next = OA.getAcquire(collisions, nextCollisionIndex);
+            if (next == null
+                || OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+              return;
+            }
+          } else {
+            OA.setRelease(collisions, collisionIndex, next);
           }
           // Counter misses may occur during this transition.
           count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
@@ -393,6 +393,61 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   }
 
   private void decaySwapAndDrop(final int counterOffset, final int maxCounterIndex,
+      final KeyVal<K, V>[] collisions, final KeyVal<K, V> entry) {
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = MAX_COUNT;
+    do {
+      int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      if (count == 0) {
+        OA.setRelease(collisions, counterIndex - counterOffset, entry);
+        BA.setRelease(counters, counterIndex, initCount);
+        while (++counterIndex < maxCounterIndex) {
+          count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
+          if (count > 0) {
+            BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+            continue;
+          }
+          if (size.getAndDecrement() <= capacity) {
+            size.getAndIncrement();
+            continue;
+          }
+          for (int collisionIndex = counterIndex - counterOffset,
+               nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
+            if (nextCollisionIndex == collisions.length) {
+              OA.setRelease(collisions, collisionIndex, null);
+              return;
+            }
+            Object next = OA.getAcquire(collisions, nextCollisionIndex);
+            if (next == null) {
+              OA.setRelease(collisions, collisionIndex, null);
+              next = OA.getAcquire(collisions, nextCollisionIndex);
+              if (next == null
+                  || OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+                return;
+              }
+            } else {
+              OA.setRelease(collisions, collisionIndex, next);
+            }
+            // Counter misses may occur during this transition.
+            count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
+            BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
+          }
+        }
+        return;
+      }
+      // Counter misses may occur between these two calls.
+      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+      if (count < minCount) {
+        minCount = count;
+        minCounterIndex = counterIndex;
+      }
+    } while (++counterIndex < maxCounterIndex);
+    OA.setRelease(collisions, minCounterIndex - counterOffset, entry);
+    BA.setRelease(counters, minCounterIndex, initCount);
+  }
+
+  private void decaySwapAndDrop2(final int counterOffset, final int maxCounterIndex,
       final KeyVal<K, V>[] collisions, final KeyVal<K, V> entry) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;

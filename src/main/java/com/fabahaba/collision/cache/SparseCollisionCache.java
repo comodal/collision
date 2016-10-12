@@ -367,24 +367,24 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           }
           for (int collisionIndex = counterIndex - counterOffset,
                nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
-            // Element at collisionIndex is a zero count known non-null that cannot be
-            // concurrently swapped, or a collision that has already been moved to the left.
-            OA.setRelease(collisions, collisionIndex, null);
             if (nextCollisionIndex == collisions.length) {
+              OA.setRelease(collisions, collisionIndex, null);
               return;
             }
-            final Object next = OA.getAcquire(collisions, nextCollisionIndex);
+            Object next = OA.getAcquire(collisions, nextCollisionIndex);
             if (next == null) {
-              return;
+              OA.setRelease(collisions, collisionIndex, null);
+              next = OA.getAcquire(collisions, nextCollisionIndex);
+              if (next == null
+                  || OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+                return;
+              }
+            } else {
+              OA.setRelease(collisions, collisionIndex, next);
             }
-            // - Try to slide new data and its counter to the front.
-            // - If a new collision concurrently sneaks in, break out.
-            if (OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
-              return;
-            }
-            // - Counter misses may occur during this transition.
-            count = ((int) BA.getAcquire(counters, counterIndex + 1)) & MAX_COUNT;
-            BA.setRelease(counters, counterIndex++, (byte) (count >> 1));
+            // Counter misses may occur during this transition.
+            count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
+            BA.setRelease(counters, counterIndex - 1, (byte) (count >> 1));
           }
         }
         return;
@@ -621,20 +621,20 @@ final class SparseCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
         }
         for (int collisionIndex = counterIndex - counterOffset,
              nextCollisionIndex = collisionIndex + 1;;++collisionIndex, ++nextCollisionIndex) {
-          // Element at collisionIndex is a zero count known non-null that cannot be
-          // concurrently swapped, or a collision that has already been moved to the left.
-          OA.setRelease(collisions, collisionIndex, null);
           if (nextCollisionIndex == collisions.length) {
+            OA.setRelease(collisions, collisionIndex, null);
             return;
           }
-          final Object next = OA.getAcquire(collisions, nextCollisionIndex);
+          Object next = OA.getAcquire(collisions, nextCollisionIndex);
           if (next == null) {
-            return;
-          }
-          // - Try to slide new data and its counter to the front.
-          // - If a new collision concurrently sneaks in, break out.
-          if (OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
-            return;
+            OA.setRelease(collisions, collisionIndex, null);
+            next = OA.getAcquire(collisions, nextCollisionIndex);
+            if (next == null
+                || OA.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+              return;
+            }
+          } else {
+            OA.setRelease(collisions, collisionIndex, next);
           }
           // Counter misses may occur during this transition.
           count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
