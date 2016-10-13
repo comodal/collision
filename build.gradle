@@ -22,7 +22,7 @@ scmVersion {
   releaseCommitMessage { version, position -> "Release $project.name-$version" }
 
   checks {
-    uncommittedChanges = true
+    uncommittedChanges = false
   }
 }
 

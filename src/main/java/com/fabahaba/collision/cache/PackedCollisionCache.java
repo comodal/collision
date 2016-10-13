@@ -508,20 +508,20 @@ final class PackedCollisionCache<K, L, V> extends BaseCollisionCache<K, L, V> {
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
           for (int nextIndex = index + 1;;++index, ++nextIndex) {
-            // Element at index is a zero count known non-null that cannot be concurrently swapped,
-            // or a collision that has already been moved to the left.
-            OA.setRelease(collisions, index, null);
             if (nextIndex == collisions.length) {
+              OA.setRelease(collisions, index, null);
               return true;
             }
-            final Object next = OA.getAcquire(collisions, nextIndex);
+            Object next = OA.getAcquire(collisions, nextIndex);
             if (next == null) {
-              return true;
-            }
-            // - Try to slide entries and their counters to the front.
-            // - If a new collision concurrently sneaks in, break out.
-            if (OA.compareAndExchangeRelease(collisions, index, null, next) != null) {
-              return true;
+              OA.setRelease(collisions, index, null);
+              next = OA.getAcquire(collisions, nextIndex);
+              if (next == null
+                  || OA.compareAndExchangeRelease(collisions, index, null, next) != null) {
+                return true;
+              }
+            } else {
+              OA.setRelease(collisions, index, next);
             }
             // Counter misses may occur during this transition.
             final int count = ((int) BA.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
