@@ -1,9 +1,9 @@
 buildscript { repositories { jcenter() } }
 plugins {
   id 'java'
-  id 'pl.allegro.tech.build.axion-release' version '1.4.0'
+  id 'pl.allegro.tech.build.axion-release' version '1.4.1'
   id 'maven-publish'
-  id 'com.jfrog.bintray' version '1.7.1'
+  id 'com.jfrog.bintray' version '1.7.2'
   id 'checkstyle'
   id 'me.champeau.gradle.jmh' version '0.3.1'
 }
@@ -33,12 +33,15 @@ sourceCompatibility = JavaVersion.VERSION_1_9
 
 repositories {
   maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
+  maven { url "https://jitpack.io" }
   jcenter()
 }
 
 dependencies {
   testCompile 'junit:junit:+'
 
+  jmh 'com.github.JCTools.JCTools:jctools-experimental:+'
+  jmh 'com.github.JCTools.JCTools:jctools-core:+'
   jmh 'com.github.ben-manes.caffeine:caffeine:+'
   jmh 'org.cache2k:cache2k-api:+'
   jmh 'org.cache2k:cache2k-core:+'
@@ -111,7 +114,7 @@ bintray {
   pkg {
     repo = 'libs'
     name = project.name
-    desc = 'Java 9 Cache'
+    desc = 'Java 9 Loading Cache'
     websiteUrl = 'https://github.com/jamespedwards42/' + project.name
     vcsUrl = 'https://github.com/jamespedwards42/' + project.name
     issueTrackerUrl = 'https://github.com/jamespedwards42/' + project.name + '/issues'

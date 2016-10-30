@@ -16,10 +16,11 @@ import static org.junit.Assert.assertTrue;
 
 abstract class BaseEntryCacheTest {
 
-  private static final ThreadLocal<MessageDigest> sha3MessageDigest512 = ThreadLocal
+  private static final String DIGEST_ALGO = "SHA3-256";
+  private static final ThreadLocal<MessageDigest> MESSAGE_DIGEST = ThreadLocal
       .withInitial(() -> {
         try {
-          return MessageDigest.getInstance("SHA3-256");
+          return MessageDigest.getInstance(DIGEST_ALGO);
         } catch (final NoSuchAlgorithmException e) {
           throw new AssertionError(e);
         }
@@ -27,7 +28,7 @@ abstract class BaseEntryCacheTest {
 
   static byte[] hashInteger(final Integer integer) {
     final byte[] intStringBytes = integer.toString().getBytes(StandardCharsets.US_ASCII);
-    return sha3MessageDigest512.get().digest(intStringBytes);
+    return MESSAGE_DIGEST.get().digest(intStringBytes);
   }
 
   static String toHexString(final byte[] hashBytes) {

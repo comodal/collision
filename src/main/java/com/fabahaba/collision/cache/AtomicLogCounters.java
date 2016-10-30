@@ -101,7 +101,7 @@ class AtomicLogCounters {
    *
    * @param from inclusive counter index to start at.
    * @param to   exclusive max index for the counters to decay.
-   * @param skip Skips decay for this entry because it is a brand new.
+   * @param skip Skips decay for this index because it corresponds to a new entry.
    */
   final void decay(final int from, final int to, final int skip) {
     int counterIndex = from;
