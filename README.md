@@ -1,6 +1,6 @@
-##Collision [![Build Status](https://travis-ci.org/jamespedwards42/collision.svg?branch=master)](https://travis-ci.org/jamespedwards42/collision) [ ![Download](https://api.bintray.com/packages/jamespedwards42/libs/collision/images/download.svg) ](https://bintray.com/jamespedwards42/libs/collision/_latestVersion) [![license](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://raw.githubusercontent.com/collision/jedipus/master/LICENSE)
+## Collision [![Build Status](https://travis-ci.org/comodal/collision.svg?branch=master)](https://travis-ci.org/comodal/collision) [ ![Download](https://api.bintray.com/packages/comodal/libraries/collision/images/download.svg) ](https://bintray.com/comodal/libraries/collision/_latestVersion) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-> Java 9 Fixed Capacity Loading Cache
+> Java 9 Fixed-Capacity Loading Cache
 
 ```java
 CollisionCache<Key, Value> cache = CollisionCache
@@ -12,25 +12,25 @@ CollisionCache<Key, Value> cache = CollisionCache
   .buildSparse();
 ```
 
-###Design Features
+### Design Features
 * Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `boolean isValForKey(K key, V val)`, then keys will not be stored.
   * For use cases with large keys relative to the size of values, using that space to store more values may dramatically improve performance.
 * Two-phase loading to separate loading of raw data and deserialization/parsing of data.  Helps to prevent unnecessary processing.
 * Uses CAS atomic operations as much as possible to optimize for concurrent access.  Specifically, Java 9 acquire/release semantics exposed through VarHandles.
 * Optional user supplied `int hashCode(K key)` function.
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
-* Compact [8-bit atomic logarithmic counters](src/main/java/com/fabahaba/collision/cache/AtomicLogCounters.java#L52) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
+* Compact [concurrent 8-bit atomic logarithmic counters](src/systems.comodal.collision/java/systems/comodal/collision/cache/AtomicLogCounters.java#L52) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
 * Atomic or aggressive loading of missing values.
 
-###Benchmarks
+### Benchmarks
 
 These benchmarks are intended to mimic those found in the [Caffeine Cache](https://github.com/ben-manes/caffeine/wiki/Benchmarks) project.  [JMH](http://openjdk.java.net/projects/code-tools/jmh/) was used to run the benchmarks.
 
-######Environment:
+###### Environment:
 * Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
 * VM: JDK 9-ea+138 / options: -server
 
-####Loading Cache: Zipf Benchmarks
+#### Loading Cache: Zipf Benchmarks
 
 Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
 
@@ -45,7 +45,7 @@ CollisionCache
     }, (key, num) -> punishMiss(num))
   .buildSparse(5.0);
 ```
-#####[Static Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadStaticZipfBenchmark.java#L70)
+##### [Static Zipf Distribution](src/jmh/java/systems/comodal/collision/benchmarks/LoadStaticZipfBenchmark.java#L70)
 
 The same collection of keys is used for all iterations. 
 
@@ -53,25 +53,25 @@ TODO ```![loading-cache-static-zipf](benchmark/loading-cache-static-zipf.png)```
 
 > JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
 
-#####[Moving Zipf Distribution](src/jmh/java/com/fabahaba/collision/benchmarks/LoadMovingZipfBenchmark.java#L52)
+##### [Moving Zipf Distribution](src/jmh/java/systems/comodal/collision/benchmarks/LoadMovingZipfBenchmark.java#L52)
 
 A new collection of keys is generated every iteration from the same Zipf generator across a range of 10 billion keys.
 
-![loading-cache-moving-zipf](https://cdn.rawgit.com/jamespedwards42/collision/master/benchmark/loading-cache-moving-zipf.svg)
+![loading-cache-moving-zipf](https://cdn.rawgit.com/comodal/collision/master/benchmark/loading-cache-moving-zipf.svg)
 
 > JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
 
-###Implementation Notes & Cache Types
-* Collision caches are backed by a large two dimensional array of generic values or [KeyVal](src/main/java/com/fabahaba/collision/cache/KeyVal.java) wrappers if storing keys.  Each hash bucket is fixed in length and should be kept small.
+### Implementation Notes & Cache Types
+* Collision caches are backed by a large two dimensional array of generic values or [KeyVal](src/systems.comodal.collision/java/systems/comodal/collision/cache/KeyVal.java) wrappers if storing keys.  Each hash bucket is fixed in length and should be kept small.
 * Hash tables are sized as a power of two.  Hash codes for keys are masked against `hashTable.length - 1` for indexing.
 * A single large byte array stores a counter for each possible entry.
 
-####Packed Caches
+#### Packed Caches
 The number of elements is not explicitly tracked, instead it is limited organically by the number of slots available in the backing hash table.  This might be useful for rare use cases where you can probably fit everything into cache, but it could possibly overflow and need some convenient mechanism to swap out elements.
 
 The number of slots in the hash table is the next power of two greater than `capacity - 1`, e.g., if capacity is 1024, then the number of slots is 1024 and if capacity is 800 then the number of slots is 1024.  The extra space over capacity is given because it is unlikely every slot will be populated.
 
-####Sparse Caches
+#### Sparse Caches
 The number of elements is explicitly tracked and can be strictly limited to `capacity` or allowed to temporarily go over `capacity` and organically decay back down as buckets with multiple entries are accessed.
 
 The number of slots in the hash table is the next power of two greater than `(sparseFactor * capacity) - 1`.
@@ -84,5 +84,5 @@ If not strictly limiting, capacity can be exceeded by the following number of en
 ```
 For this to happen, the same `capacity / bucketSize` buckets would have to fill up before any other buckets are accessed for writes.  Followed by all remaining empty buckets being accessed before full buckets are accessed, avoiding the eviction of zero count elements from crowded buckets.
 
-###Contribute
+### Contribute
 Pull requests for benchmarks and tests are welcome. Feel free to open an issue for feature requests, ideas, or issues.

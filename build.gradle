@@ -1,70 +1,39 @@
-buildscript { repositories { jcenter() } }
-plugins {
-  id 'java'
-  id 'pl.allegro.tech.build.axion-release' version '1.4.1'
-  id 'maven-publish'
-  id 'com.jfrog.bintray' version '1.7.2'
-  id 'checkstyle'
-  id 'me.champeau.gradle.jmh' version '0.3.1'
-}
-
-scmVersion {
-  tag {
-    prefix = project.name
+buildscript {
+  apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
+  repositories {
+    maven { url "https://plugins.gradle.org/m2/" }
   }
-
-  repository {
-    customUsername = "$System.env.AXION_RELEASE_GITHUB_TOKEN"
-    customPassword = ""
-  }
-
-  createReleaseCommit true
-  releaseCommitMessage { version, position -> "Release $project.name-$version" }
-
-  checks {
-    uncommittedChanges = false
+  dependencies {
+    classpath "pl.allegro.tech.build:axion-release-plugin:$axion"
+    classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:$bintray"
+    classpath "me.champeau.gradle:jmh-gradle-plugin:$jmh"
   }
 }
 
-project.group = 'com.fabahaba'
-project.version = scmVersion.version
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
+ext {
+  desc = 'Java 9 Loading Cache'
+}
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/bintray-maven.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/checks.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/jmh.gradle'
+
+compileJava {
+  options.fork = true
+}
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 
 repositories {
   maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
-  maven { url "https://jitpack.io" }
-  jcenter()
 }
 
 dependencies {
-  testCompile 'junit:junit:+'
-
-  jmh 'com.github.JCTools.JCTools:jctools-experimental:+'
-  jmh 'com.github.JCTools.JCTools:jctools-core:+'
   jmh 'com.github.ben-manes.caffeine:caffeine:+'
   jmh 'org.cache2k:cache2k-api:+'
   jmh 'org.cache2k:cache2k-core:+'
-}
-
-jmh {
-  jmhVersion = '1.15'
-
-  if (project.hasProperty('benchmarkRegex')) {
-    include = project.benchmarkRegex
-  } else {
-    tasks.jmh.doFirst { throw new GradleException("jmh: includePattern expected") }
-  }
-
-  // Charts: http://nilskp.github.io/jmh-charts
-  resultFormat = 'json'
-  resultsFile = file("${buildDir}/reports/jmh/results.json")
-  jvmArgs = '-server'
-  failOnError = true
-  forceGC = true
-  fork = 1
-  // [cl, comp, gc, stack, perf, perfnorm, perfasm, xperf, xperfasm, hs_cl, hs_comp, hs_gc, hs_rt, hs_thr]
-  profilers = []
 }
 
 test {
@@ -78,6 +47,11 @@ test {
 }
 
 sourceSets {
+  main {
+    java {
+      srcDir 'src/systems.comodal.collision/java'
+    }
+  }
   test {
     java {
       srcDir 'src/unit/java'
@@ -86,74 +60,4 @@ sourceSets {
       srcDir 'src/unit/resources'
     }
   }
-}
-
-task sourcesJar(type: Jar, dependsOn: classes) {
-  from sourceSets.main.allSource
-  classifier = 'sources'
-}
-
-publishing {
-  publications {
-    mavenJava(MavenPublication) {
-      from components.java
-
-      artifact sourcesJar
-    }
-  }
-}
-
-artifacts {
-  archives sourcesJar
-}
-
-bintray {
-  user = "$System.env.BINTRAY_USER"
-  key = "$System.env.BINTRAY_API_KEY"
-  publications = ['mavenJava']
-  pkg {
-    repo = 'libs'
-    name = project.name
-    desc = 'Java 9 Loading Cache'
-    websiteUrl = 'https://github.com/jamespedwards42/' + project.name
-    vcsUrl = 'https://github.com/jamespedwards42/' + project.name
-    issueTrackerUrl = 'https://github.com/jamespedwards42/' + project.name + '/issues'
-    licenses = ["Apache-2.0"]
-    publish = true
-    version {
-      name = project.version
-      vcsTag = scmVersion.tag.prefix + '-' + project.version
-      gpg {
-        sign = true
-        passphrase = "$System.env.BINTRAY_GPG_PASSPHRASE"
-      }
-    }
-  }
-}
-
-bintrayUpload.onlyIf { !project.version.endsWith('SNAPSHOT') }
-
-// does not support Java 9 yet.
-//findbugs {
-//  toolVersion = "+"
-//  reportsDir = file("$project.buildDir/findbugsReports")
-//  effort = "max"
-//  reportLevel = "low"
-//  ignoreFailures = false
-//  excludeFilter = file("findbugs-exclude.xml")
-//}
-//
-//tasks.withType(FindBugs) {
-//  reports {
-//    xml.enabled false
-//    html.enabled true
-//  }
-//}
-
-checkstyle {
-  config = resources.text.fromFile("checkstyle/google-checks.xml")
-  configProperties = [samedir: "${projectDir}/checkstyle"]
-  reportsDir = file("$project.buildDir/checkstyleReports")
-  toolVersion = "+"
-  ignoreFailures = false
 }

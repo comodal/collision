@@ -3,6 +3,7 @@ dist: trusty
 group: edge
 language: java
 jdk: oraclejdk9
+
 notifications:
   email:
     on_success: never
@@ -14,14 +15,15 @@ branches:
     - /^collision-.*$/
 
 before_cache:
-  - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
 
 cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
 
-install: /bin/true
+install: ./gradlew -version
 
 script: if [ ! -z "$TRAVIS_TAG" ] || [[ "$COMMIT_MSG" != 'Release collision'* ]] ; then ./gradlew check -x test && ./gradlew test -i; fi
 
