@@ -1,15 +1,15 @@
 package systems.comodal.collision.cache;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Test;
-
-import static systems.comodal.collision.cache.BaseCacheTest.TestNumber.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static systems.comodal.collision.cache.BaseCacheTest.TestNumber.of;
+
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Test;
 
 abstract class BaseCacheTest {
 
@@ -39,7 +39,7 @@ abstract class BaseCacheTest {
   public void testIfSpace() {
     final TestNumber key = of(9);
     int val = 0;
-    for (;val < maxCollisions;++val) {
+    for (; val < maxCollisions; ++val) {
       final TestNumber boxed = of(val);
       assertEquals(val, cache.putIfSpaceAbsent(key, boxed).val);
     }
@@ -59,7 +59,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testReplace() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber newBoxedKey = of(key);
       assertNotSame(boxedKey, newBoxedKey);
@@ -92,7 +92,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testLoadAggressive() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
       final TestNumber loaded = cache.getAggressive(of(key));
@@ -106,7 +106,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testLoad() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresentAcquire(boxedKey));
       final TestNumber loaded = cache.get(of(key));
@@ -120,7 +120,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testGetIfPresentAcquire() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
       assertNull(cache.getIfPresentAcquire(boxedKey));
@@ -133,7 +133,7 @@ abstract class BaseCacheTest {
 
   @Test
   public void testPutIfAbsent() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
       assertSame(expected, cache.putIfAbsent(boxedKey, expected));
@@ -143,14 +143,14 @@ abstract class BaseCacheTest {
 
   @Test
   public void testNullBuckets() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
       cache.putIfAbsent(boxedKey, expected);
       assertSame(expected, cache.getIfPresent(boxedKey));
     }
     cache.nullBuckets();
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
     }
@@ -158,14 +158,14 @@ abstract class BaseCacheTest {
 
   @Test
   public void testClear() {
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
       cache.putReplace(boxedKey, expected);
       assertSame(expected, cache.getIfPresentAcquire(boxedKey));
     }
     cache.clear();
-    for (int key = 0;key < NUM_KEYS_TO_TEST;key++) {
+    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       assertNull(cache.getIfPresent(boxedKey));
     }
@@ -175,12 +175,12 @@ abstract class BaseCacheTest {
 
     final long val;
 
-    static TestNumber of(final long val) {
-      return new TestNumber(val);
-    }
-
     TestNumber(final long val) {
       this.val = val;
+    }
+
+    static TestNumber of(final long val) {
+      return new TestNumber(val);
     }
 
     @Override

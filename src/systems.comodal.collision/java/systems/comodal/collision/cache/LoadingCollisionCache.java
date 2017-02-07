@@ -16,7 +16,7 @@ public interface LoadingCollisionCache<K, L, V> extends CollisionCache<K, V> {
    * are NOT synchronized.  If the loader returns null, then null will be returned.  The registered
    * mapper must not return null; cache performance could severely degrade.
    *
-   * @param key    used for table hash and value equality.
+   * @param key used for table hash and value equality.
    * @param loader creates values in the event of a cache miss.
    * @return a value for the corresponding key.
    */

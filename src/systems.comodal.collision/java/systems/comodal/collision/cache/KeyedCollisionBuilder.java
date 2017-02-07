@@ -34,39 +34,13 @@ public final class KeyedCollisionBuilder<K, V> {
     }
   }
 
-  static final class DefaultIsValForKey<K, V> implements BiPredicate<K, V> {
-
-    @Override
-    public boolean test(final K key, final V val) {
-      return val.equals(key);
-    }
-  }
-
-  static final class DefaultHashCoder<K> implements ToIntFunction<K> {
-
-    /**
-     * Taken from {@link java.util.concurrent.ConcurrentHashMap#spread
-     * java.util.concurrent.ConcurrentHashMap}
-     *
-     * @see java.util.concurrent.ConcurrentHashMap#spread(int)
-     */
-    private static int spread(final int hash) {
-      return hash ^ (hash >>> 16);
-    }
-
-    @Override
-    public int applyAsInt(final K key) {
-      return spread(key.hashCode());
-    }
-  }
-
   public CollisionCache<K, V> buildSparse() {
     return buildSparse(CollisionBuilder.DEFAULT_SPARSE_FACTOR);
   }
 
   /**
    * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
-   *                     Defaults to 3.0 and has a minimum of 1.0.
+   * Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link CollisionCache CollisionCache}.
    */
   public CollisionCache<K, V> buildSparse(final double sparseFactor) {
@@ -115,7 +89,7 @@ public final class KeyedCollisionBuilder<K, V> {
    *
    * @param loader returns values for a given key.
    * @param mapper map loaded types to value types.
-   * @param <L>    The intermediate type between loading and mapping.
+   * @param <L> The intermediate type between loading and mapping.
    * @return {@link LoadingCollisionBuilder LoadingCollisionBuilder} to continue building process.
    */
   public <L> LoadingCollisionBuilder<K, L, V> setLoader(final Function<K, L> loader,
@@ -218,5 +192,31 @@ public final class KeyedCollisionBuilder<K, V> {
   public KeyedCollisionBuilder<K, V> setStoreKeys(final boolean storeKeys) {
     delegate.setStoreKeys(storeKeys);
     return this;
+  }
+
+  static final class DefaultIsValForKey<K, V> implements BiPredicate<K, V> {
+
+    @Override
+    public boolean test(final K key, final V val) {
+      return val.equals(key);
+    }
+  }
+
+  static final class DefaultHashCoder<K> implements ToIntFunction<K> {
+
+    /**
+     * Taken from {@link java.util.concurrent.ConcurrentHashMap#spread
+     * java.util.concurrent.ConcurrentHashMap}
+     *
+     * @see java.util.concurrent.ConcurrentHashMap#spread(int)
+     */
+    private static int spread(final int hash) {
+      return hash ^ (hash >>> 16);
+    }
+
+    @Override
+    public int applyAsInt(final K key) {
+      return spread(key.hashCode());
+    }
   }
 }

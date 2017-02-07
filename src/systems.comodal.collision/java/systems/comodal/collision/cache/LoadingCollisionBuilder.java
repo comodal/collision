@@ -24,7 +24,7 @@ public final class LoadingCollisionBuilder<K, L, V> {
 
   /**
    * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
-   *                     Defaults to 3.0 and has a minimum of 1.0.
+   * Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link LoadingCollisionCache LoadingCollisionCache}.
    */
   public LoadingCollisionCache<K, L, V> buildSparse(final double sparseFactor) {

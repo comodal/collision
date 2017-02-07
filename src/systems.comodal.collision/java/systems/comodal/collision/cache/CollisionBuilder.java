@@ -10,7 +10,12 @@ public final class CollisionBuilder<V> {
 
   static final int DEFAULT_SPARSE_BUCKET_SIZE = 4;
   static final int DEFAULT_PACKED_BUCKET_SIZE = 8;
-
+  /**
+   * Multiplied by the desired capacity to determine the hash table length.
+   * Increase to reduce collisions.
+   * If increasing consider lazyInitBuckets to prevent unnecessary array creation.
+   */
+  static final double DEFAULT_SPARSE_FACTOR = 3.0;
   private final int capacity;
   private boolean strictCapacity = false;
   private Class<V> valueType;
@@ -24,20 +29,13 @@ public final class CollisionBuilder<V> {
     this.capacity = capacity;
   }
 
-  /**
-   * Multiplied by the desired capacity to determine the hash table length.
-   * Increase to reduce collisions.
-   * If increasing consider lazyInitBuckets to prevent unnecessary array creation.
-   */
-  static final double DEFAULT_SPARSE_FACTOR = 3.0;
-
   public <K> CollisionCache<K, V> buildSparse() {
     return buildSparse(DEFAULT_SPARSE_FACTOR);
   }
 
   /**
    * @param sparseFactor Used to expand the size of the backing hash table to reduce collisions.
-   *                     Defaults to 3.0 and has a minimum of 1.0.
+   * Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link CollisionCache CollisionCache}.
    */
   public <K> CollisionCache<K, V> buildSparse(final double sparseFactor) {
@@ -197,7 +195,7 @@ public final class CollisionBuilder<V> {
    *
    * @param loader returns values for a given key.
    * @param mapper map loaded types to value types.
-   * @param <L>    The intermediate type between loading and mapping.
+   * @param <L> The intermediate type between loading and mapping.
    * @return {@link LoadingCollisionBuilder LoadingCollisionBuilder} to continue building process.
    */
   public <K, L> LoadingCollisionBuilder<K, L, V> setLoader(final Function<K, L> loader,

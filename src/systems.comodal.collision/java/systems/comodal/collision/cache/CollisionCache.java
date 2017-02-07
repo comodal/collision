@@ -36,7 +36,7 @@ public interface CollisionCache<K, V> {
    * returns null, then null will be returned.  Calls to the loader are synchronized behind the hash
    * bucket for this key.
    *
-   * @param key        used for table hash and stored key/value equality.
+   * @param key used for table hash and stored key/value equality.
    * @param loadAndMap creates values in the event of a cache miss.
    * @return a value for the corresponding key.
    */
@@ -60,7 +60,7 @@ public interface CollisionCache<K, V> {
    * loader are NOT synchronized.  If the loader returns null, then null will
    * be returned.  The mapper must not return null; cache performance could severely degrade.
    *
-   * @param key    used for table hash and stored key/value equality.
+   * @param key used for table hash and stored key/value equality.
    * @param loader creates values in the event of a cache miss.
    * @param mapper maps loaded values to value types.
    * @return a value for the corresponding key.
@@ -119,7 +119,7 @@ public interface CollisionCache<K, V> {
    *
    * @param key used for table hash and stored key/value equality.
    * @param val The value to put if an entry exists or there is null space.  In race conditions
-   *            occurring after entry to this call, another value may win.
+   * occurring after entry to this call, another value may win.
    * @return the value in the cache after this call.
    */
   V putIfSpaceReplace(final K key, final V val);

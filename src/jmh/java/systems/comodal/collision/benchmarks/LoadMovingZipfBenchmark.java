@@ -1,5 +1,8 @@
 package systems.comodal.collision.benchmarks;
 
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.IntStream;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -13,10 +16,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.IntStream;
-
 @State(Scope.Benchmark)
 @Threads(32)
 @BenchmarkMode(Mode.Throughput)
@@ -25,16 +24,17 @@ import java.util.stream.IntStream;
 @Measurement(iterations = 10)
 public class LoadMovingZipfBenchmark {
 
+  private final Long[] keys = new Long[LoadStaticZipfBenchmark.SIZE];
+  private final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(
+      LoadStaticZipfBenchmark.ITEMS);
   @Param({
-             "Cache2k",
-             "Caffeine",
-             "Collision",
-             "Collision_Aggressive"
-         })
+      "Cache2k",
+      "Caffeine",
+      "Collision",
+      "Collision_Aggressive"
+  })
   private LoadStaticZipfBenchmark.BenchmarkFunctionFactory cacheType;
   private Function<Long, Long> benchmarkFunction;
-  private final Long[] keys = new Long[LoadStaticZipfBenchmark.SIZE];
-  private final ScrambledZipfGenerator generator = new ScrambledZipfGenerator(LoadStaticZipfBenchmark.ITEMS);
 
   @Setup(Level.Iteration)
   public void setup() {

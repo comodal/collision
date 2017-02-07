@@ -95,7 +95,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
     final int hash = hashCoder.applyAsInt(key) & mask;
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
-    for (int index = 0;;) {
+    for (int index = 0; ; ) {
       final KeyVal<K, V> collision = collisions[index];
       if (collision == null) {
         return checkDecayAndSwap(counterOffset, collisions, key, loadAndMap);
@@ -116,9 +116,9 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
    * behavior will be in line with the method {@link #decayAndSwap decayAndSwap}
    *
    * @param counterOffset beginning counter array index corresponding to collision values.
-   * @param collisions    values sitting in a hash bucket.
-   * @param key           used for table hash and entry equality.
-   * @param loadAndMap    loads a new value to cache if missing.
+   * @param collisions values sitting in a hash bucket.
+   * @param key used for table hash and entry equality.
+   * @param loadAndMap loads a new value to cache if missing.
    * @return a value for the corresponding key.
    */
   abstract V checkDecayAndSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
@@ -131,9 +131,9 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
    * the method {@link #decayAndSwap decayAndSwap}
    *
    * @param counterOffset beginning counter array index corresponding to collision values.
-   * @param collisions    values sitting in a hash bucket.
-   * @param key           used for table hash and entry equality.
-   * @param loadAndMap    loads a new value to cache if missing.
+   * @param collisions values sitting in a hash bucket.
+   * @param key used for table hash and entry equality.
+   * @param loadAndMap loads a new value to cache if missing.
    * @return a value for the corresponding key.
    */
   abstract V checkDecayAndProbSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
@@ -144,10 +144,10 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
    * least frequently used, and sets its counter to an initial val.  Also evicts the tail entry if
    * its count is zero.
    *
-   * @param counterOffset   beginning counter array index corresponding to collision values.
+   * @param counterOffset beginning counter array index corresponding to collision values.
    * @param maxCounterIndex Max counter index for known non null collision values.
-   * @param collisions      values sitting in a hash bucket.
-   * @param entry           The value to put in place of the least frequently used value.
+   * @param collisions values sitting in a hash bucket.
+   * @param entry The value to put in place of the least frequently used value.
    */
   final void decayAndSwap(final int counterOffset, final int maxCounterIndex,
       final KeyVal[] collisions, final KeyVal<K, V> entry) {

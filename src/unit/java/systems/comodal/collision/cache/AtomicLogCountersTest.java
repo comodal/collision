@@ -1,13 +1,11 @@
 package systems.comodal.collision.cache;
 
-import org.junit.Before;
-import org.junit.Test;
-import systems.comodal.collision.cache.AtomicLogCounters;
-
-import java.util.stream.IntStream;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+
+import java.util.stream.IntStream;
+import org.junit.Before;
+import org.junit.Test;
 
 public class AtomicLogCountersTest {
 
@@ -34,7 +32,7 @@ public class AtomicLogCountersTest {
     double deltaPercentage = .20;
     double minDelta = 7;
 
-    for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0;;) {
+    for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0; ; ) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
       final int actual = counters.getAcquireCount(counterIndex);
       final double delta = minDelta + expected * deltaPercentage;
@@ -57,7 +55,7 @@ public class AtomicLogCountersTest {
       }
     }
 
-    for (int i = 0;i < numCounters;++i) {
+    for (int i = 0; i < numCounters; ++i) {
       if (i == counterIndex) {
         assertEquals(AtomicLogCounters.MAX_COUNT, counters.getAcquireCount(i));
       } else {
@@ -69,23 +67,23 @@ public class AtomicLogCountersTest {
   @Test
   public void testDecay() {
     int initCount = 2;
-    for (int i = 0;i < numCounters;++i) {
+    for (int i = 0; i < numCounters; ++i) {
       counters.initCount(i, initCount);
       assertEquals(initCount, counters.getAcquireCount(i));
       initCount = Math.min(AtomicLogCounters.MAX_COUNT, initCount << 1);
     }
 
     for (int i = 0,
-         counterIndex = 7,
-         decayed = AtomicLogCounters.MAX_COUNT,
-         iterations = Integer.numberOfTrailingZeros(256) + 1;
-         i < iterations;++i) {
+        counterIndex = 7,
+        decayed = AtomicLogCounters.MAX_COUNT,
+        iterations = Integer.numberOfTrailingZeros(256) + 1;
+        i < iterations; ++i) {
       counters.decay(0, numCounters, -1);
       decayed /= 2;
       assertEquals(decayed, counters.getAcquireCount(counterIndex));
     }
 
-    for (int i = 0;i < numCounters;++i) {
+    for (int i = 0; i < numCounters; ++i) {
       assertEquals(0, counters.getAcquireCount(i));
     }
   }

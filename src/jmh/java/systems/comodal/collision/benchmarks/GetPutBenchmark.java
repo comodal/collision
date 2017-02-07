@@ -1,8 +1,8 @@
 package systems.comodal.collision.benchmarks;
 
-import systems.comodal.collision.cache.CollisionCache;
 import com.github.benmanes.caffeine.cache.Cache;
-
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.cache2k.Cache2kBuilder;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -16,9 +16,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-
-import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
+import systems.comodal.collision.cache.CollisionCache;
 
 @State(Scope.Group)
 @BenchmarkMode(Mode.Throughput)
@@ -27,18 +25,17 @@ import java.util.stream.IntStream;
 @Measurement(iterations = 20)
 public class GetPutBenchmark {
 
-  @Param({
-             "Cache2k",
-             "Caffeine",
-             "Collision"
-         })
-  private CacheFactory cacheType;
-  private GetPutCache<Long, Boolean> cache;
-  private Long[] keys;
-
   private static final int SIZE = (2 << 14);
   private static final int MASK = SIZE - 1;
   private static final int ITEMS = SIZE / 3;
+  @Param({
+      "Cache2k",
+      "Caffeine",
+      "Collision"
+  })
+  private CacheFactory cacheType;
+  private GetPutCache<Long, Boolean> cache;
+  private Long[] keys;
 
   @Setup
   public void setup() {
@@ -79,13 +76,6 @@ public class GetPutBenchmark {
   @GroupThreads(4)
   public Boolean readWritePut(LoadStaticZipfBenchmark.ThreadState threadState) {
     return cache.put(keys[threadState.index++ & MASK], Boolean.TRUE);
-  }
-
-  private interface GetPutCache<K, V> {
-
-    V get(final K key);
-
-    V put(final K key, final V val);
   }
 
   public enum CacheFactory {
@@ -160,5 +150,12 @@ public class GetPutBenchmark {
     };
 
     abstract <K, V> GetPutCache<K, V> create(final int capacity);
+  }
+
+  private interface GetPutCache<K, V> {
+
+    V get(final K key);
+
+    V put(final K key, final V val);
   }
 }

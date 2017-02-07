@@ -1,63 +1,64 @@
 buildscript {
-  apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
-  repositories {
-    maven { url "https://plugins.gradle.org/m2/" }
-  }
-  dependencies {
-    classpath "pl.allegro.tech.build:axion-release-plugin:$axion"
-    classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:$bintray"
-    classpath "me.champeau.gradle:jmh-gradle-plugin:$jmh"
-  }
+    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
+    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/plugins.gradle'
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "pl.allegro.tech.build:axion-release-plugin:$axion"
+        classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:$bintray"
+        classpath "me.champeau.gradle:jmh-gradle-plugin:$jmh"
+    }
 }
 
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java.gradle'
+ext {
+    desc = 'Java 9 Loading Cache'
+}
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/java.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
-ext {
-  desc = 'Java 9 Loading Cache'
-}
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/bintray-maven.gradle'
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/checks.gradle'
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/jmh.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/bintray-maven.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/jmh.gradle'
 
 compileJava {
-  options.fork = true
+    options.fork = true
 }
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 
 repositories {
-  maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
+    maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
 }
 
 dependencies {
-  jmh 'com.github.ben-manes.caffeine:caffeine:+'
-  jmh 'org.cache2k:cache2k-api:+'
-  jmh 'org.cache2k:cache2k-core:+'
+    jmh 'com.github.ben-manes.caffeine:caffeine:+'
+    jmh 'org.cache2k:cache2k-api:+'
+    jmh 'org.cache2k:cache2k-core:+'
 }
 
 test {
-  if (project.hasProperty('excludeTests')) {
-    exclude project.excludeTests
-  }
-  maxParallelForks = 2
-  testLogging {
-    events "passed", "skipped", "failed", "standardOut", "standardError"
-  }
+    if (project.hasProperty('excludeTests')) {
+        exclude project.excludeTests
+    }
+    maxParallelForks = 2
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+    }
 }
 
 sourceSets {
-  main {
-    java {
-      srcDir 'src/systems.comodal.collision/java'
+    main {
+        java {
+            srcDir 'src/systems.comodal.collision/java'
+        }
     }
-  }
-  test {
-    java {
-      srcDir 'src/unit/java'
+    test {
+        java {
+            srcDir 'src/unit/java'
+        }
+        resources {
+            srcDir 'src/unit/resources'
+        }
     }
-    resources {
-      srcDir 'src/unit/resources'
-    }
-  }
 }

@@ -1,19 +1,17 @@
 package systems.comodal.collision.cache;
 
-import org.junit.After;
-import org.junit.Test;
-import systems.comodal.collision.cache.LoadingCollisionCache;
-
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import org.junit.After;
+import org.junit.Test;
 
 abstract class BaseEntryCacheTest {
 
@@ -26,6 +24,15 @@ abstract class BaseEntryCacheTest {
           throw new AssertionError(e);
         }
       });
+  private static String[] expectedHashes = new String[32];
+
+  static {
+    for (int i = 0; i < expectedHashes.length; i++) {
+      expectedHashes[i] = toHexString(hashInteger(i));
+    }
+  }
+
+  LoadingCollisionCache<Integer, byte[], String> cache;
 
   static byte[] hashInteger(final Integer integer) {
     final byte[] intStringBytes = integer.toString().getBytes(StandardCharsets.US_ASCII);
@@ -36,16 +43,6 @@ abstract class BaseEntryCacheTest {
     return new BigInteger(1, hashBytes).toString(16);
   }
 
-  private static String[] expectedHashes = new String[32];
-
-  static {
-    for (int i = 0;i < expectedHashes.length;i++) {
-      expectedHashes[i] = toHexString(hashInteger(i));
-    }
-  }
-
-  LoadingCollisionCache<Integer, byte[], String> cache;
-
   @After
   public void after() {
     cache = null;
@@ -53,7 +50,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testPutGetExisting() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       assertNull(cache.getIfPresent(key));
       assertSame(expected, cache.putIfAbsent(key, expected));
@@ -67,7 +64,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testLoadAggressive() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       assertNull(cache.getIfPresent(key));
       final String loaded = cache.getAggressive(key);
@@ -80,7 +77,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testLoad() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       assertNull(cache.getIfPresentAcquire(key));
       final String loaded = cache.get(key);
@@ -93,7 +90,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testGetIfPresentAcquire() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       assertNull(cache.getIfPresentAcquire(key));
       assertSame(expected, cache.putIfAbsent(key, expected));
@@ -105,7 +102,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testPutIfAbsent() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       assertSame(expected, cache.putIfAbsent(key, expected));
       assertSame(expected, cache.putIfAbsent(key, expected));
@@ -114,7 +111,7 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testReplace() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       final String newHash = toHexString(hashInteger(key));
       assertNotSame(expected, newHash);
@@ -147,26 +144,26 @@ abstract class BaseEntryCacheTest {
 
   @Test
   public void testNullBuckets() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       cache.putIfAbsent(key, expected);
       assertEquals(expected, cache.getIfPresent(key));
     }
     cache.nullBuckets();
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       assertNull(cache.getIfPresent(key));
     }
   }
 
   @Test
   public void testClear() {
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       cache.putReplace(key, expected);
       assertEquals(expected, cache.getIfPresentAcquire(key));
     }
     cache.clear();
-    for (int key = 0;key < expectedHashes.length;key++) {
+    for (int key = 0; key < expectedHashes.length; key++) {
       assertNull(cache.getIfPresent(key));
     }
   }

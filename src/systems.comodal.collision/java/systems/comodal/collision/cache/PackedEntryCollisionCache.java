@@ -70,7 +70,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (;;) {
+      for (; ; ) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           if (index == 0) { // Strict capacity checked in parent call.
@@ -123,7 +123,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (;;) {
+      for (; ; ) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) { // Assume over capacity.
           final V val = mapper.apply(key, loaded);
@@ -177,7 +177,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       final Function<K, V> loadAndMap) {
     int index = 0;
     synchronized (collisions) {
-      for (;;) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
+      for (; ; ) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
@@ -228,7 +228,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (;;) {
+      for (; ; ) {
         KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
@@ -330,7 +330,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (;;) {
+      for (; ; ) {
         final KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (collision.val == val) {
           return val;
@@ -405,7 +405,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (;;) {
+      for (; ; ) {
         final KeyVal<K, V> collision = (KeyVal<K, V>) OA.getAcquire(collisions, index);
         if (key.equals(collision.key)) {
           return collision.val;
@@ -527,7 +527,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         if (key.equals(collision.key)) {
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
-          for (int nextIndex = index + 1;;++index, ++nextIndex) {
+          for (int nextIndex = index + 1; ; ++index, ++nextIndex) {
             if (nextIndex == collisions.length) {
               OA.setRelease(collisions, index, null);
               return true;

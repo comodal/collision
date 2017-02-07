@@ -16,12 +16,12 @@ import java.util.stream.IntStream;
 abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     implements LoadingCollisionCache<K, L, V> {
 
-  private final Class<V> valueType;
   final int maxCollisionsShift;
   final V[][] hashTable;
   final int mask;
   final ToIntFunction<K> hashCoder;
   final BiPredicate<K, V> isValForKey;
+  private final Class<V> valueType;
   private final Function<K, L> loader;
   private final BiFunction<K, L, V> mapper;
   private final Function<K, V> loadAndMap;
@@ -101,7 +101,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final int hash = hashCoder.applyAsInt(key) & mask;
     final V[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
-    for (int index = 0;;) {
+    for (int index = 0; ; ) {
       final V collision = collisions[index];
       if (collision == null) {
         return checkDecayAndSwap(counterOffset, collisions, key, loadAndMap);
@@ -122,9 +122,9 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
    * behavior will be in line with the method {@link #decayAndSwap decayAndSwap}
    *
    * @param counterOffset beginning counter array index corresponding to collision values.
-   * @param collisions    values sitting in a hash bucket.
-   * @param key           used for table hash and entry equality.
-   * @param loadAndMap    loads a new value to cache if missing.
+   * @param collisions values sitting in a hash bucket.
+   * @param key used for table hash and entry equality.
+   * @param loadAndMap loads a new value to cache if missing.
    * @return a value for the corresponding key.
    */
   abstract V checkDecayAndSwap(final int counterOffset, final V[] collisions,
@@ -137,9 +137,9 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
    * the method {@link #decayAndSwap decayAndSwap}
    *
    * @param counterOffset beginning counter array index corresponding to collision values.
-   * @param collisions    values sitting in a hash bucket.
-   * @param key           used for table hash and entry equality.
-   * @param loadAndMap    loads a new value to cache if missing.
+   * @param collisions values sitting in a hash bucket.
+   * @param key used for table hash and entry equality.
+   * @param loadAndMap loads a new value to cache if missing.
    * @return a value for the corresponding key.
    */
   abstract V checkDecayAndProbSwap(final int counterOffset, final V[] collisions,
@@ -150,10 +150,10 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
    * least frequently used, and sets its counter to an initial val.  Also evicts the tail entry if
    * its count is zero.
    *
-   * @param counterOffset   beginning counter array index corresponding to collision values.
+   * @param counterOffset beginning counter array index corresponding to collision values.
    * @param maxCounterIndex Max counter index for known non null collision values.
-   * @param collisions      values sitting in a hash bucket.
-   * @param val             The value to put in place of the least frequently used value.
+   * @param collisions values sitting in a hash bucket.
+   * @param val The value to put in place of the least frequently used value.
    */
   final void decayAndSwap(final int counterOffset, final int maxCounterIndex, final V[] collisions,
       final V val) {
