@@ -20,8 +20,8 @@ abstract class BaseEntryCacheTest {
       .withInitial(() -> {
         try {
           return MessageDigest.getInstance(DIGEST_ALGO);
-        } catch (final NoSuchAlgorithmException e) {
-          throw new AssertionError(e);
+        } catch (final NoSuchAlgorithmException ex) {
+          throw new AssertionError(ex);
         }
       });
   private static String[] expectedHashes = new String[32];

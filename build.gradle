@@ -1,6 +1,6 @@
 buildscript {
-    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/plugins.gradle'
     apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
+    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/plugins.gradle'
     dependencies {
         classpath "$axion"
         classpath "$bintray"
@@ -11,6 +11,7 @@ buildscript {
 ext {
     desc = 'Java 9 Loading Cache'
 }
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/travisci.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/java.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
