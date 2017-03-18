@@ -23,7 +23,7 @@ final class KeyVal<K, V> {
     if (this == obj) {
       return true;
     }
-    if (obj == null || getClass() != obj.getClass()) {
+    if (obj == null || KeyVal.class != obj.getClass()) {
       return false;
     }
     final KeyVal<?, ?> keyVal = (KeyVal<?, ?>) obj;

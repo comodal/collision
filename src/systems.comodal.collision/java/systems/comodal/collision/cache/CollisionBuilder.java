@@ -89,8 +89,7 @@ public final class CollisionBuilder<V> {
     return buildPacked(
         new KeyedCollisionBuilder.DefaultHashCoder<>(),
         new KeyedCollisionBuilder.DefaultIsValForKey<>(),
-        key -> null,
-        null);
+        key -> null, null);
   }
 
   <K, L> LoadingCollisionCache<K, L, V> buildPacked(
@@ -143,7 +142,6 @@ public final class CollisionBuilder<V> {
     if (valueType == null) {
       throw new IllegalStateException("valueType needed.");
     }
-
     if (lazyInitBuckets) {
       final Class<?> valueArrayType = Array.newInstance(valueType, 0).getClass();
       return (V[][]) Array.newInstance(valueArrayType, hashTableLength);

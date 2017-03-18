@@ -62,7 +62,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     V[] collisions = hashTable[hash];
     if (collisions == null) {
       collisions = (V[]) Array.newInstance(valueType, 1 << maxCollisionsShift);
-      final Object witness = OA.compareAndExchangeRelease(hashTable, hash, null, collisions);
+      final Object witness = COLLISIONS.compareAndExchangeRelease(hashTable, hash, null, collisions);
       return witness == null ? collisions : (V[]) witness;
     }
     return collisions;
@@ -161,28 +161,28 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     do {
-      int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
-        OA.setRelease(collisions, counterIndex - counterOffset, val);
-        BA.setRelease(counters, counterIndex, initCount);
+        COLLISIONS.setOpaque(collisions, counterIndex - counterOffset, val);
+        COUNTERS.setOpaque(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
+          count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
           if (count == 0) {
             continue;
           }
-          BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+          COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
         }
         return;
       }
       // Counter misses may occur between these two calls.
-      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+      COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
       if (count < minCount) {
         minCount = count;
         minCounterIndex = counterIndex;
       }
     } while (++counterIndex < maxCounterIndex);
-    OA.setRelease(collisions, minCounterIndex - counterOffset, val);
-    BA.setRelease(counters, minCounterIndex, initCount);
+    COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, val);
+    COUNTERS.setOpaque(counters, minCounterIndex, initCount);
   }
 
   /**
@@ -217,7 +217,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final V val = (V) OA.getAcquire(collisions, index);
+      final V val = (V) COLLISIONS.getAcquire(collisions, index);
       if (val == null) {
         return null;
       }
@@ -241,7 +241,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final V[] collisions = getCreateCollisions(hashCoder.applyAsInt(key) & mask);
     int index = 0;
     do {
-      final V collision = (V) OA.getAcquire(collisions, index);
+      final V collision = (V) COLLISIONS.getAcquire(collisions, index);
       if (collision == null) {
         return null;
       }
@@ -249,7 +249,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
         return val;
       }
       if (isValForKey.test(key, collision)) {
-        final V witness = (V) OA.compareAndExchangeRelease(collisions, index, collision, val);
+        final V witness = (V) COLLISIONS.compareAndExchangeRelease(collisions, index, collision, val);
         if (witness == collision) {
           return val;
         }

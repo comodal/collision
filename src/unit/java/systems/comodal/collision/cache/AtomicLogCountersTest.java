@@ -29,7 +29,7 @@ public class AtomicLogCountersTest {
     final int counterIndex = 3;
     counters.initCount(counterIndex);
 
-    double deltaPercentage = .20;
+    double deltaPercentage = .18;
     double minDelta = 7;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0; ; ) {

@@ -11,8 +11,8 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 class AtomicLogCounters {
 
-  static final VarHandle BA = MethodHandles.arrayElementVarHandle(byte[].class);
-  static final VarHandle OA = MethodHandles.arrayElementVarHandle(Object[].class);
+  static final VarHandle COUNTERS = MethodHandles.arrayElementVarHandle(byte[].class);
+  static final VarHandle COLLISIONS = MethodHandles.arrayElementVarHandle(Object[].class);
 
   static final int MAX_COUNT = 0xff;
 
@@ -46,15 +46,15 @@ class AtomicLogCounters {
   }
 
   final void initCount(final int index) {
-    BA.setRelease(counters, index, initCount);
+    COUNTERS.setOpaque(counters, index, initCount);
   }
 
   final void initCount(final int index, final int initCount) {
-    BA.setRelease(counters, index, (byte) initCount);
+    COUNTERS.setOpaque(counters, index, (byte) initCount);
   }
 
   final int getAcquireCount(final int index) {
-    return ((int) BA.getAcquire(counters, index)) & MAX_COUNT;
+    return ((int) COUNTERS.getAcquire(counters, index)) & MAX_COUNT;
   }
 
   /**
@@ -65,7 +65,7 @@ class AtomicLogCounters {
    * @param index counter array index to increment.
    */
   final void atomicIncrement(final int index) {
-    byte witness = (byte) BA.getAcquire(counters, index);
+    byte witness = (byte) COUNTERS.getAcquire(counters, index);
     int count = ((int) witness) & MAX_COUNT;
     if (count == MAX_COUNT) {
       return;
@@ -73,7 +73,7 @@ class AtomicLogCounters {
     byte expected;
     while (count <= initCount) {
       expected = witness;
-      witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      witness = (byte) COUNTERS.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {
         return;
       }
@@ -85,7 +85,7 @@ class AtomicLogCounters {
     final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble())) >>> pow2LogFactor;
     while (prob >= count) {
       expected = witness;
-      witness = (byte) BA.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      witness = (byte) COUNTERS.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {
         return;
       }
@@ -109,12 +109,12 @@ class AtomicLogCounters {
       if (counterIndex == skip) {
         continue;
       }
-      final int count = ((int) BA.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      final int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         continue;
       }
       // Counter misses may occur between these two calls.
-      BA.setRelease(counters, counterIndex, (byte) (count >> 1));
+      COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
     } while (++counterIndex < to);
   }
 }

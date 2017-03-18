@@ -20,7 +20,7 @@ import systems.comodal.collision.cache.CollisionCache;
 
 @State(Scope.Group)
 @BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.SECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 10)
 @Measurement(iterations = 20)
 public class GetPutBenchmark {
