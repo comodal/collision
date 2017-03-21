@@ -55,7 +55,7 @@ abstract class BaseEntryCacheTest {
       assertNull(cache.getIfPresent(key));
       assertSame(expected, cache.putIfAbsent(key, expected));
       assertSame(expected, cache.putIfAbsent(key, expected));
-      assertSame(expected, cache.getIfPresentAcquire(key));
+      assertSame(expected, cache.getIfPresent(key));
       assertSame(expected, cache.getIfPresent(key));
       assertSame(expected, cache.get(key));
       assertSame(expected, cache.getAggressive(key));
@@ -79,24 +79,24 @@ abstract class BaseEntryCacheTest {
   public void testLoad() {
     for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
-      assertNull(cache.getIfPresentAcquire(key));
+      assertNull(cache.getIfPresent(key));
       final String loaded = cache.get(key);
       assertEquals(expected, loaded);
-      assertEquals(expected, cache.getIfPresentAcquire(key));
-      assertSame(loaded, cache.getIfPresentAcquire(key));
+      assertEquals(expected, cache.getIfPresent(key));
+      assertSame(loaded, cache.getIfPresent(key));
       assertSame(loaded, cache.get(key));
     }
   }
 
   @Test
-  public void testGetIfPresentAcquire() {
+  public void testgetIfPresent() {
     for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
-      assertNull(cache.getIfPresentAcquire(key));
+      assertNull(cache.getIfPresent(key));
       assertSame(expected, cache.putIfAbsent(key, expected));
-      assertSame(expected, cache.getIfPresentAcquire(key));
+      assertSame(expected, cache.getIfPresent(key));
       cache.remove(key);
-      assertNull(cache.getIfPresentAcquire(key));
+      assertNull(cache.getIfPresent(key));
     }
   }
 
@@ -126,7 +126,7 @@ abstract class BaseEntryCacheTest {
       assertSame(newHash, cache.replace(key, newHash));
       assertSame(newHash, cache.getIfPresent(key));
       assertSame(expected, cache.replace(key, expected));
-      assertSame(expected, cache.getIfPresentAcquire(key));
+      assertSame(expected, cache.getIfPresent(key));
 
       assertTrue(cache.remove(key));
       assertSame(newHash, cache.putReplace(key, newHash));
@@ -138,7 +138,7 @@ abstract class BaseEntryCacheTest {
       assertNull(cache.replace(key, newHash));
       assertNull(cache.getIfPresent(key));
       assertNull(cache.replace(key, expected));
-      assertNull(cache.getIfPresentAcquire(key));
+      assertNull(cache.getIfPresent(key));
     }
   }
 
@@ -160,7 +160,7 @@ abstract class BaseEntryCacheTest {
     for (int key = 0; key < expectedHashes.length; key++) {
       final String expected = expectedHashes[key];
       cache.putReplace(key, expected);
-      assertEquals(expected, cache.getIfPresentAcquire(key));
+      assertEquals(expected, cache.getIfPresent(key));
     }
     cache.clear();
     for (int key = 0; key < expectedHashes.length; key++) {

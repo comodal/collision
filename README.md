@@ -15,7 +15,7 @@ CollisionCache<Key, Value> cache = CollisionCache
 * Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `boolean isValForKey(K key, V val)`, then keys will not be stored.
   * For use cases with large keys relative to the size of values, using that space to store more values may dramatically improve performance.
 * Two-phase loading to separate loading of raw data and deserialization/parsing of data.  Helps to prevent unnecessary processing.
-* Uses CAS atomic operations as much as possible to optimize for concurrent access.  Specifically, Java 9 acquire/release semantics exposed through VarHandles.
+* Uses CAS atomic operations as much as possible to optimize for concurrent access.
 * Optional user supplied `int hashCode(K key)` function.
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
 * Compact [concurrent 8-bit atomic logarithmic counters](src/systems.comodal.collision/java/systems/comodal/collision/cache/AtomicLogCounters.java#L52) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.

@@ -29,7 +29,7 @@ abstract class BaseCacheTest {
     assertNull(cache.getIfPresent(key));
     assertSame(key, cache.putIfAbsent(key, key));
     assertSame(key, cache.putIfAbsent(key, key));
-    assertSame(key, cache.getIfPresentAcquire(key));
+    assertSame(key, cache.getIfPresent(key));
     assertSame(key, cache.getIfPresent(key));
     assertSame(key, cache.get(key));
     assertSame(key, cache.getAggressive(key));
@@ -74,7 +74,7 @@ abstract class BaseCacheTest {
       assertSame(boxedKey, cache.replace(boxedKey, boxedKey));
       assertSame(boxedKey, cache.getIfPresent(boxedKey));
       assertSame(newBoxedKey, cache.replace(boxedKey, newBoxedKey));
-      assertSame(newBoxedKey, cache.getIfPresentAcquire(boxedKey));
+      assertSame(newBoxedKey, cache.getIfPresent(boxedKey));
 
       assertTrue(cache.remove(boxedKey));
       assertSame(newBoxedKey, cache.putReplace(boxedKey, newBoxedKey));
@@ -86,7 +86,7 @@ abstract class BaseCacheTest {
       assertNull(cache.replace(boxedKey, newBoxedKey));
       assertNull(cache.getIfPresent(boxedKey));
       assertNull(cache.replace(boxedKey, boxedKey));
-      assertNull(cache.getIfPresentAcquire(boxedKey));
+      assertNull(cache.getIfPresent(boxedKey));
     }
   }
 
@@ -108,26 +108,26 @@ abstract class BaseCacheTest {
   public void testLoad() {
     for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
-      assertNull(cache.getIfPresentAcquire(boxedKey));
+      assertNull(cache.getIfPresent(boxedKey));
       final TestNumber loaded = cache.get(of(key));
       assertEquals(boxedKey, loaded);
       assertNotSame(boxedKey, loaded);
-      assertEquals(boxedKey, cache.getIfPresentAcquire(boxedKey));
-      assertSame(loaded, cache.getIfPresentAcquire(boxedKey));
+      assertEquals(boxedKey, cache.getIfPresent(boxedKey));
+      assertSame(loaded, cache.getIfPresent(boxedKey));
       assertSame(loaded, cache.get(boxedKey));
     }
   }
 
   @Test
-  public void testGetIfPresentAcquire() {
+  public void testgetIfPresent() {
     for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
-      assertNull(cache.getIfPresentAcquire(boxedKey));
+      assertNull(cache.getIfPresent(boxedKey));
       assertSame(expected, cache.putIfAbsent(boxedKey, expected));
-      assertSame(expected, cache.getIfPresentAcquire(boxedKey));
+      assertSame(expected, cache.getIfPresent(boxedKey));
       cache.remove(boxedKey);
-      assertNull(cache.getIfPresentAcquire(boxedKey));
+      assertNull(cache.getIfPresent(boxedKey));
     }
   }
 
@@ -162,7 +162,7 @@ abstract class BaseCacheTest {
       final TestNumber boxedKey = of(key);
       final TestNumber expected = of(key);
       cache.putReplace(boxedKey, expected);
-      assertSame(expected, cache.getIfPresentAcquire(boxedKey));
+      assertSame(expected, cache.getIfPresent(boxedKey));
     }
     cache.clear();
     for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {

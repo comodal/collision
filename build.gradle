@@ -29,6 +29,11 @@ repositories {
     maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
 }
 
+configurations.all {
+    resolutionStrategy.cacheDynamicVersionsFor 60, 'minutes'
+    resolutionStrategy.cacheChangingModulesFor 60, 'minutes'
+}
+
 dependencies {
     jmh 'com.github.ben-manes.caffeine:caffeine:+'
     jmh 'org.cache2k:cache2k-api:+'

@@ -29,12 +29,12 @@ public class AtomicLogCountersTest {
     final int counterIndex = 3;
     counters.initCount(counterIndex);
 
-    double deltaPercentage = .18;
+    double deltaPercentage = .2;
     double minDelta = 7;
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0; ; ) {
       IntStream.range(i, log).parallel().forEach(j -> counters.atomicIncrement(counterIndex));
-      final int actual = counters.getAcquireCount(counterIndex);
+      final int actual = counters.getOpaqueCount(counterIndex);
       final double delta = minDelta + expected * deltaPercentage;
       System.out.printf("%d <> %d +- %.1f%n", expected, actual, delta);
       assertTrue(actual >= previousExpected);
@@ -57,9 +57,9 @@ public class AtomicLogCountersTest {
 
     for (int i = 0; i < numCounters; ++i) {
       if (i == counterIndex) {
-        assertEquals(AtomicLogCounters.MAX_COUNT, counters.getAcquireCount(i));
+        assertEquals(AtomicLogCounters.MAX_COUNT, counters.getOpaqueCount(i));
       } else {
-        assertEquals(0, counters.getAcquireCount(i));
+        assertEquals(0, counters.getOpaqueCount(i));
       }
     }
   }
@@ -69,7 +69,7 @@ public class AtomicLogCountersTest {
     int initCount = 2;
     for (int i = 0; i < numCounters; ++i) {
       counters.initCount(i, initCount);
-      assertEquals(initCount, counters.getAcquireCount(i));
+      assertEquals(initCount, counters.getOpaqueCount(i));
       initCount = Math.min(AtomicLogCounters.MAX_COUNT, initCount << 1);
     }
 
@@ -80,11 +80,11 @@ public class AtomicLogCountersTest {
         i < iterations; ++i) {
       counters.decay(0, numCounters, -1);
       decayed /= 2;
-      assertEquals(decayed, counters.getAcquireCount(counterIndex));
+      assertEquals(decayed, counters.getOpaqueCount(counterIndex));
     }
 
     for (int i = 0; i < numCounters; ++i) {
-      assertEquals(0, counters.getAcquireCount(i));
+      assertEquals(0, counters.getOpaqueCount(i));
     }
   }
 }

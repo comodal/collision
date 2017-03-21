@@ -25,7 +25,7 @@ import systems.comodal.collision.cache.LoadingCollisionBuilder;
 @State(Scope.Benchmark)
 @Threads(32)
 @BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.SECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 public class LoadStaticZipfBenchmark {

@@ -48,7 +48,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final int counterOffset = hash << maxCollisionsShift;
     int index = 0;
     do {
-      KeyVal<K, V> collision = collisions[index];
+      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         final I loaded = loader.apply(key);
         if (loaded == null) {
@@ -64,8 +64,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         }
         final KeyVal<K, V> entry = new KeyVal(key, mapper.apply(key, loaded));
         do {
-          collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, null, entry);
+          collision = (KeyVal<K, V>) COLLISIONS.compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             COUNTERS.setOpaque(counters, counterOffset + index, initCount);
             size.getAndIncrement();
@@ -100,13 +99,13 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) { // Assume over capacity.
           final V val = mapper.apply(key, loaded);
           final KeyVal<K, V> entry = new KeyVal(key, val);
           if (index == 0) { // Strict capacity checked in parent call.
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterIndex, initCount);
               size.getAndIncrement();
@@ -129,7 +128,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+        int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -159,11 +158,11 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) { // Assume over capacity.
           if (index == 0) { // Strict capacity checked in parent call.
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterIndex, initCount);
               size.getAndIncrement();
@@ -186,7 +185,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+        int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -219,7 +218,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     synchronized (collisions) {
       for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
           if (val == null) {
@@ -239,7 +238,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           final KeyVal<K, V> entry = new KeyVal(key, val);
           do {
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterOffset + index, initCount);
               size.getAndIncrement();
@@ -288,7 +287,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
           if (val == null) {
@@ -308,7 +307,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           final KeyVal<K, V> entry = new KeyVal(key, val);
           do {
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterOffset + index, initCount);
               size.getAndIncrement();
@@ -330,7 +329,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+        int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -361,7 +360,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       if (counterIndex == skipIndex) {
         continue;
       }
-      int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         if (counterIndex < skipIndex) {
           continue;
@@ -376,19 +375,19 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
             COLLISIONS.setOpaque(collisions, collisionIndex, null);
             return;
           }
-          Object next = COLLISIONS.getAcquire(collisions, nextCollisionIndex);
+          Object next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
           if (next == null) {
             COLLISIONS.setOpaque(collisions, collisionIndex, null);
-            next = COLLISIONS.getAcquire(collisions, nextCollisionIndex);
+            next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
             if (next == null
-                || COLLISIONS.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+                || COLLISIONS.compareAndExchange(collisions, collisionIndex, null, next) != null) {
               return;
             }
           } else {
             COLLISIONS.setOpaque(collisions, collisionIndex, next);
           }
           // Counter misses may occur during this transition.
-          count = ((int) COUNTERS.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
+          count = ((int) COUNTERS.getOpaque(counters, ++counterIndex)) & MAX_COUNT;
           COUNTERS.setOpaque(counters, counterIndex - 1, (byte) (count >> 1));
         }
       }
@@ -403,12 +402,12 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     do {
-      int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         COLLISIONS.setOpaque(collisions, counterIndex - counterOffset, entry);
         COUNTERS.setOpaque(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+          count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
           if (count > 0) {
             COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
             continue;
@@ -423,19 +422,20 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
               COLLISIONS.setOpaque(collisions, collisionIndex, null);
               return;
             }
-            Object next = COLLISIONS.getAcquire(collisions, nextCollisionIndex);
+            Object next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
             if (next == null) {
               COLLISIONS.setOpaque(collisions, collisionIndex, null);
-              next = COLLISIONS.getAcquire(collisions, nextCollisionIndex);
+              next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
               if (next == null
-                  || COLLISIONS.compareAndExchangeRelease(collisions, collisionIndex, null, next) != null) {
+                  || COLLISIONS.compareAndExchange(collisions, collisionIndex, null, next)
+                  != null) {
                 return;
               }
             } else {
               COLLISIONS.setOpaque(collisions, collisionIndex, next);
             }
             // Counter misses may occur during this transition.
-            count = ((int) COUNTERS.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
+            count = ((int) COUNTERS.getOpaque(counters, ++counterIndex)) & MAX_COUNT;
             COUNTERS.setOpaque(counters, counterIndex - 1, (byte) (count >> 1));
           }
         }
@@ -463,7 +463,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     KeyVal<K, V> entry = null;
     do {
-      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         if (index == 0) {
           // If not strict, allow first entry into first collision index.
@@ -477,8 +477,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           entry = new KeyVal(key, val);
         }
         do {
-          collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, null, entry);
+          collision = (KeyVal<K, V>) COLLISIONS.compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             COUNTERS.setOpaque(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -498,7 +497,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           entry = new KeyVal(key, val);
         }
         final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
-            .compareAndExchangeRelease(collisions, index, collision, entry);
+            .compareAndExchange(collisions, index, collision, entry);
         if (witness == collision) {
           return val;
         }
@@ -515,14 +514,14 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ++counterIndex) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {  // Assume over capacity.
           if (entry == null) {
             entry = new KeyVal(key, val);
           }
           if (index == 0) {  // Strict capacity checked above.
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterIndex, initCount);
               size.getAndIncrement();
@@ -548,7 +547,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
             entry = new KeyVal(key, val);
           }
           final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, collision, entry);
+              .compareAndExchange(collisions, index, collision, entry);
           if (witness == collision) {
             return val;
           }
@@ -557,7 +556,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
         }
 
-        int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+        int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -591,7 +590,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     KeyVal<K, V> entry = null;
     do {
-      KeyVal<K, V> collision = collisions[index];
+      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         if (index == 0) {
           // If not strict, allow first entry into first collision index.
@@ -604,7 +603,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         entry = new KeyVal(key, val);
         do {
           collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, null, entry);
+              .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             COUNTERS.setOpaque(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -628,14 +627,14 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {  // Assume over capacity.
           if (entry == null) {
             entry = new KeyVal(key, val);
           }
           if (index == 0) {  // Strict capacity checked above.
             collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchangeRelease(collisions, index, null, entry);
+                .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               COUNTERS.setOpaque(counters, counterIndex, initCount);
               size.getAndIncrement();
@@ -656,7 +655,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return collision.val;
         }
 
-        int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+        int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
         if (count < minCount) {
           minCount = count;
           minCounterIndex = counterIndex;
@@ -689,7 +688,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      KeyVal<K, V> collision = collisions[index];
+      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         if (size.get() > capacity) {
           return null;
@@ -697,7 +696,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         final KeyVal<K, V> entry = new KeyVal(key, val);
         do {
           collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, null, entry);
+              .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             COUNTERS.setOpaque(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -727,7 +726,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int index = 0;
     KeyVal<K, V> entry = null;
     do {
-      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+      KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         if (size.get() > capacity) {
           return null;
@@ -737,7 +736,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         }
         do {
           collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchangeRelease(collisions, index, null, entry);
+              .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             COUNTERS.setOpaque(counters, (hash << maxCollisionsShift) + index, initCount);
             size.getAndIncrement();
@@ -757,7 +756,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           entry = new KeyVal(key, val);
         }
         final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
-            .compareAndExchangeRelease(collisions, index, collision, entry);
+            .compareAndExchange(collisions, index, collision, entry);
         if (witness == collision) {
           return val;
         }
@@ -780,7 +779,7 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     synchronized (collisions) {
       int index = 0;
       do {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getAcquire(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {
           return false;
         }
@@ -793,19 +792,19 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
               COLLISIONS.setOpaque(collisions, index, null);
               return true;
             }
-            Object next = COLLISIONS.getAcquire(collisions, nextIndex);
+            Object next = COLLISIONS.getOpaque(collisions, nextIndex);
             if (next == null) {
               COLLISIONS.setOpaque(collisions, index, null);
-              next = COLLISIONS.getAcquire(collisions, nextIndex);
+              next = COLLISIONS.getOpaque(collisions, nextIndex);
               if (next == null
-                  || COLLISIONS.compareAndExchangeRelease(collisions, index, null, next) != null) {
+                  || COLLISIONS.compareAndExchange(collisions, index, null, next) != null) {
                 return true;
               }
             } else {
               COLLISIONS.setOpaque(collisions, index, next);
             }
             // Counter misses may occur during this transition.
-            final int count = ((int) COUNTERS.getAcquire(counters, ++counterIndex)) & MAX_COUNT;
+            final int count = ((int) COUNTERS.getOpaque(counters, ++counterIndex)) & MAX_COUNT;
             COUNTERS.setOpaque(counters, counterIndex - 1, (byte) (count >> 1));
           }
         }
@@ -822,13 +821,13 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   public void clear() {
     synchronized (hashTable) {
       IntStream.range(0, hashTable.length).parallel().forEach(i -> {
-        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) COLLISIONS.getAcquire(hashTable, i);
+        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) COLLISIONS.getOpaque(hashTable, i);
         if (collisions == null) {
           return;
         }
         int index = 0;
         do {
-          final Object collision = COLLISIONS.getAndSetRelease(collisions, index, null);
+          final Object collision = COLLISIONS.getAndSet(collisions, index, null);
           if (collision != null) {
             size.getAndDecrement();
           }
@@ -845,14 +844,13 @@ final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   public void nullBuckets() {
     synchronized (hashTable) {
       IntStream.range(0, hashTable.length).parallel().forEach(i -> {
-        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) COLLISIONS
-            .getAndSetRelease(hashTable, i, null);
+        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) COLLISIONS.getAndSet(hashTable, i, null);
         if (collisions == null) {
           return;
         }
         int index = 0;
         do {
-          final Object collision = COLLISIONS.getAndSetRelease(collisions, index, null);
+          final Object collision = COLLISIONS.getAndSet(collisions, index, null);
           if (collision != null) {
             size.getAndDecrement();
           }

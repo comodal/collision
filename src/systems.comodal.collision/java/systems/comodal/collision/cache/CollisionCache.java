@@ -131,15 +131,6 @@ public interface CollisionCache<K, V> {
   V getIfPresent(final K key);
 
   /**
-   * Uses {@link java.lang.invoke.VarHandle#getAcquire VarHandle#getAcquire} to access existing
-   * elements.
-   *
-   * @param key used for table hash and stored key/value equality.
-   * @return the pre-existing value for this key.
-   */
-  V getIfPresentAcquire(final K key);
-
-  /**
    * Removes any entry for the corresponding key.
    *
    * @param key used for table hash and stored key/value equality.

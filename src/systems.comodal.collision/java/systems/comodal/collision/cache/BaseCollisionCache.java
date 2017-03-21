@@ -1,5 +1,7 @@
 package systems.comodal.collision.cache;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -15,6 +17,8 @@ import java.util.stream.IntStream;
  */
 abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     implements LoadingCollisionCache<K, L, V> {
+
+  static final VarHandle COLLISIONS = MethodHandles.arrayElementVarHandle(Object[].class);
 
   final int maxCollisionsShift;
   final V[][] hashTable;
@@ -62,7 +66,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     V[] collisions = hashTable[hash];
     if (collisions == null) {
       collisions = (V[]) Array.newInstance(valueType, 1 << maxCollisionsShift);
-      final Object witness = COLLISIONS.compareAndExchangeRelease(hashTable, hash, null, collisions);
+      final Object witness = COLLISIONS.compareAndExchange(hashTable, hash, null, collisions);
       return witness == null ? collisions : (V[]) witness;
     }
     return collisions;
@@ -102,7 +106,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final V[] collisions = getCreateCollisions(hash);
     final int counterOffset = hash << maxCollisionsShift;
     for (int index = 0; ; ) {
-      final V collision = collisions[index];
+      final V collision = (V) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         return checkDecayAndSwap(counterOffset, collisions, key, loadAndMap);
       }
@@ -118,7 +122,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
 
   /**
    * Checks for an existing entry synchronized behind the current collision hash bucket using
-   * acquire memory access semantics.  If an entry does not exist, a value is loaded and the
+   * opaque memory access semantics.  If an entry does not exist, a value is loaded and the
    * behavior will be in line with the method {@link #decayAndSwap decayAndSwap}
    *
    * @param counterOffset beginning counter array index corresponding to collision values.
@@ -132,7 +136,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
 
   /**
    * Checks for an existing entry synchronized behind the current collision hash bucket using
-   * acquire memory access semantics.  The minimum count for each entry is proactively tracked for
+   * opaque memory access semantics.  The minimum count for each entry is proactively tracked for
    * swapping.  If an entry does not exist, a value is loaded and the behavior will be in line with
    * the method {@link #decayAndSwap decayAndSwap}
    *
@@ -161,12 +165,12 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     do {
-      int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         COLLISIONS.setOpaque(collisions, counterIndex - counterOffset, val);
         COUNTERS.setOpaque(counters, counterIndex, initCount);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+          count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
           if (count == 0) {
             continue;
           }
@@ -195,29 +199,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final V[] collisions = getCreateCollisions(hash);
     int index = 0;
     do {
-      final V val = collisions[index];
-      if (val == null) {
-        return null;
-      }
-      if (isValForKey.test(key, val)) {
-        atomicIncrement((hash << maxCollisionsShift) + index);
-        return val;
-      }
-    } while (++index < collisions.length);
-    return null;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  @SuppressWarnings("unchecked")
-  public final V getIfPresentAcquire(final K key) {
-    final int hash = hashCoder.applyAsInt(key) & mask;
-    final V[] collisions = getCreateCollisions(hash);
-    int index = 0;
-    do {
-      final V val = (V) COLLISIONS.getAcquire(collisions, index);
+      final V val = (V) COLLISIONS.getOpaque(collisions, index);
       if (val == null) {
         return null;
       }
@@ -241,7 +223,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
     final V[] collisions = getCreateCollisions(hashCoder.applyAsInt(key) & mask);
     int index = 0;
     do {
-      final V collision = (V) COLLISIONS.getAcquire(collisions, index);
+      final V collision = (V) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
         return null;
       }
@@ -249,7 +231,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
         return val;
       }
       if (isValForKey.test(key, collision)) {
-        final V witness = (V) COLLISIONS.compareAndExchangeRelease(collisions, index, collision, val);
+        final V witness = (V) COLLISIONS.compareAndExchange(collisions, index, collision, val);
         if (witness == collision) {
           return val;
         }
@@ -275,7 +257,7 @@ abstract class BaseCollisionCache<K, L, V> extends AtomicLogCounters
           }
           int index = 0;
           do {
-            collisions[index++] = null;
+            COLLISIONS.setOpaque(collisions, index++, null);
           } while (index < collisions.length);
         });
   }

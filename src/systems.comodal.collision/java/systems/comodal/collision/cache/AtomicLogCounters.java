@@ -12,7 +12,6 @@ import java.util.concurrent.ThreadLocalRandom;
 class AtomicLogCounters {
 
   static final VarHandle COUNTERS = MethodHandles.arrayElementVarHandle(byte[].class);
-  static final VarHandle COLLISIONS = MethodHandles.arrayElementVarHandle(Object[].class);
 
   static final int MAX_COUNT = 0xff;
 
@@ -53,8 +52,9 @@ class AtomicLogCounters {
     COUNTERS.setOpaque(counters, index, (byte) initCount);
   }
 
-  final int getAcquireCount(final int index) {
-    return ((int) COUNTERS.getAcquire(counters, index)) & MAX_COUNT;
+
+  final int getOpaqueCount(final int index) {
+    return ((int) COUNTERS.getOpaque(counters, index)) & MAX_COUNT;
   }
 
   /**
@@ -65,7 +65,7 @@ class AtomicLogCounters {
    * @param index counter array index to increment.
    */
   final void atomicIncrement(final int index) {
-    byte witness = (byte) COUNTERS.getAcquire(counters, index);
+    byte witness = (byte) COUNTERS.getOpaque(counters, index);
     int count = ((int) witness) & MAX_COUNT;
     if (count == MAX_COUNT) {
       return;
@@ -73,7 +73,7 @@ class AtomicLogCounters {
     byte expected;
     while (count <= initCount) {
       expected = witness;
-      witness = (byte) COUNTERS.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      witness = (byte) COUNTERS.compareAndExchange(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {
         return;
       }
@@ -85,7 +85,7 @@ class AtomicLogCounters {
     final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble())) >>> pow2LogFactor;
     while (prob >= count) {
       expected = witness;
-      witness = (byte) COUNTERS.compareAndExchangeRelease(counters, index, expected, (byte) (count + 1));
+      witness = (byte) COUNTERS.compareAndExchange(counters, index, expected, (byte) (count + 1));
       if (expected == witness) {
         return;
       }
@@ -109,7 +109,7 @@ class AtomicLogCounters {
       if (counterIndex == skip) {
         continue;
       }
-      final int count = ((int) COUNTERS.getAcquire(counters, counterIndex)) & MAX_COUNT;
+      final int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         continue;
       }
