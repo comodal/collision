@@ -1,5 +1,8 @@
 package systems.comodal.collision.cache;
 
+import static systems.comodal.collision.cache.CollisionBuilder.DEFAULT_HASH_CODER;
+import static systems.comodal.collision.cache.CollisionBuilder.DEFAULT_IS_VAL_FOR_KEY;
+
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -98,7 +101,7 @@ public final class KeyedCollisionBuilder<K, V> {
   }
 
   public ToIntFunction<K> getHashCoder() {
-    return hashCoder == null ? new DefaultHashCoder<>() : hashCoder;
+    return hashCoder == null ? (ToIntFunction<K>) DEFAULT_HASH_CODER : hashCoder;
   }
 
   /**
@@ -115,7 +118,7 @@ public final class KeyedCollisionBuilder<K, V> {
   }
 
   public BiPredicate<K, V> getIsValForKey() {
-    return isValForKey == null ? new DefaultIsValForKey<>() : isValForKey;
+    return isValForKey == null ? (BiPredicate<K, V>) DEFAULT_IS_VAL_FOR_KEY : isValForKey;
   }
 
   /**
@@ -192,31 +195,5 @@ public final class KeyedCollisionBuilder<K, V> {
   public KeyedCollisionBuilder<K, V> setStoreKeys(final boolean storeKeys) {
     delegate.setStoreKeys(storeKeys);
     return this;
-  }
-
-  static final class DefaultIsValForKey<K, V> implements BiPredicate<K, V> {
-
-    @Override
-    public boolean test(final K key, final V val) {
-      return val.equals(key);
-    }
-  }
-
-  static final class DefaultHashCoder<K> implements ToIntFunction<K> {
-
-    /**
-     * Taken from {@link java.util.concurrent.ConcurrentHashMap#spread
-     * java.util.concurrent.ConcurrentHashMap}
-     *
-     * @see java.util.concurrent.ConcurrentHashMap#spread(int)
-     */
-    private static int spread(final int hash) {
-      return hash ^ (hash >>> 16);
-    }
-
-    @Override
-    public int applyAsInt(final K key) {
-      return spread(key.hashCode());
-    }
   }
 }

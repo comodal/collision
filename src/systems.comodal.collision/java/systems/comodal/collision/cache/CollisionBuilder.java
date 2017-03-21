@@ -10,6 +10,11 @@ public final class CollisionBuilder<V> {
 
   static final int DEFAULT_SPARSE_BUCKET_SIZE = 4;
   static final int DEFAULT_PACKED_BUCKET_SIZE = 8;
+
+  static final Function<?, ?> NULL_LOADER = key -> null;
+  static final ToIntFunction<?> DEFAULT_HASH_CODER = key -> spread(key.hashCode());
+  static final BiPredicate<?, ?> DEFAULT_IS_VAL_FOR_KEY = (val, key) -> val.equals(key);
+
   /**
    * Multiplied by the desired capacity to determine the hash table length.
    * Increase to reduce collisions.
@@ -24,9 +29,18 @@ public final class CollisionBuilder<V> {
   private int maxCounterVal = 1_048_576;
   private boolean lazyInitBuckets = false;
   private boolean storeKeys = true;
-
   CollisionBuilder(final int capacity) {
     this.capacity = capacity;
+  }
+
+  /**
+   * Taken from {@link java.util.concurrent.ConcurrentHashMap#spread
+   * java.util.concurrent.ConcurrentHashMap}
+   *
+   * @see java.util.concurrent.ConcurrentHashMap#spread(int)
+   */
+  private static int spread(final int hash) {
+    return (hash ^ (hash >>> 16));
   }
 
   public <K> CollisionCache<K, V> buildSparse() {
@@ -41,9 +55,9 @@ public final class CollisionBuilder<V> {
   public <K> CollisionCache<K, V> buildSparse(final double sparseFactor) {
     return buildSparse(
         sparseFactor,
-        new KeyedCollisionBuilder.DefaultHashCoder<>(),
-        new KeyedCollisionBuilder.DefaultIsValForKey<>(),
-        key -> null,
+        (ToIntFunction<K>) DEFAULT_HASH_CODER,
+        (BiPredicate<K, V>) DEFAULT_IS_VAL_FOR_KEY,
+        (Function<K, ?>) NULL_LOADER,
         null);
   }
 
@@ -87,9 +101,9 @@ public final class CollisionBuilder<V> {
 
   public <K> CollisionCache<K, V> buildPacked() {
     return buildPacked(
-        new KeyedCollisionBuilder.DefaultHashCoder<>(),
-        new KeyedCollisionBuilder.DefaultIsValForKey<>(),
-        key -> null, null);
+        (ToIntFunction<K>) DEFAULT_HASH_CODER,
+        (BiPredicate<K, V>) DEFAULT_IS_VAL_FOR_KEY,
+        (Function<K, ?>) NULL_LOADER, null);
   }
 
   <K, L> LoadingCollisionCache<K, L, V> buildPacked(

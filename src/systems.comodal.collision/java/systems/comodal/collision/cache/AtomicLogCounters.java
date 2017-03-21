@@ -17,7 +17,7 @@ class AtomicLogCounters {
 
   final byte[] counters;
   final byte initCount;
-  private final int pow2LogFactor;
+  private final double[] thresholds;
 
   AtomicLogCounters(final int numCounters, final int initCount, final int maxCounterVal) {
     this(new byte[numCounters], initCount, calcLogFactorShift(maxCounterVal));
@@ -26,7 +26,11 @@ class AtomicLogCounters {
   AtomicLogCounters(final byte[] counters, final int initCount, final int pow2LogFactor) {
     this.counters = counters;
     this.initCount = (byte) initCount;
-    this.pow2LogFactor = pow2LogFactor;
+    this.thresholds = new double[MAX_COUNT];
+    thresholds[0] = 1.0;
+    for (int i = 1; i < MAX_COUNT; i++) {
+      thresholds[i] = 1.0 / ((long) i << pow2LogFactor);
+    }
   }
 
   /**
@@ -65,32 +69,28 @@ class AtomicLogCounters {
    * @param index counter array index to increment.
    */
   final void atomicIncrement(final int index) {
-    byte witness = (byte) COUNTERS.getOpaque(counters, index);
-    int count = ((int) witness) & MAX_COUNT;
+    int witness = (int) COUNTERS.getOpaque(counters, index);
+    int count = witness & MAX_COUNT;
     if (count == MAX_COUNT) {
       return;
     }
-    byte expected;
+    int expected;
     while (count <= initCount) {
       expected = witness;
-      witness = (byte) COUNTERS.compareAndExchange(counters, index, expected, (byte) (count + 1));
-      if (expected == witness) {
-        return;
-      }
-      count = ((int) witness) & MAX_COUNT;
-      if (count == MAX_COUNT) {
+      witness = (int) COUNTERS
+          .compareAndExchange(counters, index, (byte) expected, (byte) (count + 1));
+      if (expected == witness || (count = witness & MAX_COUNT) == MAX_COUNT) {
         return;
       }
     }
-    final int prob = ((int) (1.0 / ThreadLocalRandom.current().nextDouble())) >>> pow2LogFactor;
-    while (prob >= count) {
+    if (thresholds[count] < ThreadLocalRandom.current().nextFloat()) {
+      return;
+    }
+    for (; ; ) {
       expected = witness;
-      witness = (byte) COUNTERS.compareAndExchange(counters, index, expected, (byte) (count + 1));
-      if (expected == witness) {
-        return;
-      }
-      count = ((int) witness) & MAX_COUNT;
-      if (count == MAX_COUNT) {
+      witness = (int) COUNTERS
+          .compareAndExchange(counters, index, (byte) expected, (byte) (count + 1));
+      if (expected == witness || (count = witness & MAX_COUNT) == MAX_COUNT) {
         return;
       }
     }
@@ -104,17 +104,18 @@ class AtomicLogCounters {
    * @param skip Skips decay for this index because it corresponds to a new entry.
    */
   final void decay(final int from, final int to, final int skip) {
-    int counterIndex = from;
-    do {
-      if (counterIndex == skip) {
-        continue;
-      }
+    decay(from, skip);
+    decay(skip + 1, to);
+  }
+
+  final void decay(final int from, final int to) {
+    for (int counterIndex = from; counterIndex < to; ++counterIndex) {
       final int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
       if (count == 0) {
         continue;
       }
       // Counter misses may occur between these two calls.
       COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
-    } while (++counterIndex < to);
+    }
   }
 }
