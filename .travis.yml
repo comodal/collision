@@ -4,6 +4,9 @@ group: edge
 language: java
 jdk: oraclejdk9
 
+env:
+  - JAVA_OPTS="--add-opens=java.base/java.lang=ALL-UNNAMED"
+
 notifications:
   email:
     on_success: never
