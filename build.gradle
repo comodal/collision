@@ -16,10 +16,14 @@ apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/j
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/bintray-maven.gradle'
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
+// apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/jmh.gradle'
 
 sourceCompatibility = JavaVersion.VERSION_1_9
+
+tasks.withType(Test) {
+    jvmArgs += ['-XX:+IgnoreUnrecognizedVMOptions', '--permit-illegal-access']
+}
 
 repositories {
     maven { url "http://oss.sonatype.org/content/repositories/snapshots" }

@@ -1,4 +1,4 @@
-## Collision [![Build Status](https://travis-ci.org/comodal/collision.svg?branch=master)](https://travis-ci.org/comodal/collision) [ ![Download](https://api.bintray.com/packages/comodal/libraries/collision/images/download.svg) ](https://bintray.com/comodal/libraries/collision/_latestVersion) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+## Collision [![Build Status](https://travis-ci.org/comodal/collision.svg?branch=master)](https://travis-ci.org/comodal/collision)  [![Download](https://api.bintray.com/packages/comodal/libraries/collision/images/download.svg) ](https://bintray.com/comodal/libraries/collision/_latestVersion)  [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 > Java 9 Fixed-Capacity Loading Cache
 
 ```java
