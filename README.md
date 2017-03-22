@@ -12,8 +12,22 @@ CollisionCache<Key, Value> cache = CollisionCache
 ```
 
 ### Gradle Java 9 Build Workaround
+Run and add the following:
 ```sh
 export JAVA_OPTS="--add-opens=java.base/java.lang=ALL-UNNAMED"
+```
+
+gradle.properties
+```
+org.gradle.jvmargs=--add-opens=java.base/java.lang=ALL-UNNAMED \
+  --add-opens=java.base/java.util=ALL-UNNAMED
+```
+
+build.gradle
+```
+tasks.withType(Test) {
+    jvmArgs += ['--add-opens=java.base/java.lang=ALL-UNNAMED']
+}
 ```
 
 ### Design Features

@@ -13,15 +13,15 @@ ext {
 }
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/travisci.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/java.gradle'
-//apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
+apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/bintray-maven.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/jmh.gradle'
 
-tasks.withType(Test) {
-    jvmArgs += ['--add-opens=java.base/java.lang=ALL-UNNAMED']
-}
+// tasks.withType(Test) {
+//     jvmArgs += ['--add-opens=java.base/java.lang=ALL-UNNAMED']
+// }
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 
