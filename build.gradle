@@ -19,10 +19,6 @@ apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/b
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/jmh.gradle'
 
-// tasks.withType(Test) {
-//     jvmArgs += ['--add-opens=java.base/java.lang=ALL-UNNAMED']
-// }
-
 sourceCompatibility = JavaVersion.VERSION_1_9
 
 repositories {
@@ -30,8 +26,8 @@ repositories {
 }
 
 configurations.all {
-    resolutionStrategy.cacheDynamicVersionsFor 60, 'minutes'
-    resolutionStrategy.cacheChangingModulesFor 60, 'minutes'
+    resolutionStrategy.cacheDynamicVersionsFor 1, 'minutes'
+    resolutionStrategy.cacheChangingModulesFor 1, 'minutes'
 }
 
 dependencies {
