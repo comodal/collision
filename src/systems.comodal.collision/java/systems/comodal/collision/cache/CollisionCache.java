@@ -142,9 +142,4 @@ public interface CollisionCache<K, V> {
    * Sets all hash table bucket slots to null.
    */
   void clear();
-
-  /**
-   * Sets all hash table buckets to null;
-   */
-  void nullBuckets();
 }

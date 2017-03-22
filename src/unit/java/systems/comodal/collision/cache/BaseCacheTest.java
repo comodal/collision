@@ -142,21 +142,6 @@ abstract class BaseCacheTest {
   }
 
   @Test
-  public void testNullBuckets() {
-    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
-      final TestNumber boxedKey = of(key);
-      final TestNumber expected = of(key);
-      cache.putIfAbsent(boxedKey, expected);
-      assertSame(expected, cache.getIfPresent(boxedKey));
-    }
-    cache.nullBuckets();
-    for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
-      final TestNumber boxedKey = of(key);
-      assertNull(cache.getIfPresent(boxedKey));
-    }
-  }
-
-  @Test
   public void testClear() {
     for (int key = 0; key < NUM_KEYS_TO_TEST; key++) {
       final TestNumber boxedKey = of(key);

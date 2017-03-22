@@ -1,10 +1,12 @@
 package systems.comodal.collision.cache;
 
+import static systems.comodal.collision.cache.AtomicLogCounters.MAX_COUNT;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.lang.reflect.Array;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 import java.util.stream.IntStream;
 
@@ -14,14 +16,15 @@ import java.util.stream.IntStream;
  * @param <V> the type of mapped values
  * @author James P. Edwards
  */
-abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
-    implements LoadingCollisionCache<K, L, V> {
+abstract class BaseEntryCollisionCache<K, L, V> implements LoadingCollisionCache<K, L, V> {
 
   static final VarHandle COLLISIONS = MethodHandles.arrayElementVarHandle(Object[].class);
 
   final int maxCollisionsShift;
   final KeyVal<K, V>[][] hashTable;
   final int mask;
+  final IntFunction<KeyVal<K, V>[]> getBucket;
+  final AtomicLogCounters counters;
   final ToIntFunction<K> hashCoder;
   private final Function<K, L> loader;
   private final BiFunction<K, L, V> mapper;
@@ -29,17 +32,17 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
 
   BaseEntryCollisionCache(
       final int maxCollisionsShift,
-      final byte[] counters,
-      final int initCount,
-      final int pow2LogFactor,
       final KeyVal<K, V>[][] hashTable,
+      final IntFunction<KeyVal<K, V>[]> getBucket,
+      final AtomicLogCounters counters,
       final ToIntFunction<K> hashCoder,
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
-    super(counters, initCount, pow2LogFactor);
     this.maxCollisionsShift = maxCollisionsShift;
     this.hashTable = hashTable;
     this.mask = hashTable.length - 1;
+    this.getBucket = getBucket;
+    this.counters = counters;
     this.hashCoder = hashCoder;
     this.loader = loader;
     this.mapper = mapper;
@@ -47,23 +50,6 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
       final L loaded = loader.apply(key);
       return loaded == null ? null : mapper.apply(key, loaded);
     };
-  }
-
-  /**
-   * CAS initialize an array for holding values at a given hash location.
-   *
-   * @param hash The hash table index.
-   * @return The hash bucket array, referred to as collisions.
-   */
-  @SuppressWarnings("unchecked")
-  final KeyVal<K, V>[] getCreateCollisions(final int hash) {
-    KeyVal<K, V>[] collisions = hashTable[hash];
-    if (collisions == null) {
-      collisions = (KeyVal<K, V>[]) Array.newInstance(KeyVal.class, 1 << maxCollisionsShift);
-      final Object witness = COLLISIONS.compareAndExchange(hashTable, hash, null, collisions);
-      return witness == null ? collisions : (KeyVal<K, V>[]) witness;
-    }
-    return collisions;
   }
 
   /**
@@ -97,7 +83,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
   @SuppressWarnings("unchecked")
   public final V get(final K key, final Function<K, V> loadAndMap) {
     final int hash = hashCoder.applyAsInt(key) & mask;
-    final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
+    final KeyVal<K, V>[] collisions = getBucket.apply(hash);
     final int counterOffset = hash << maxCollisionsShift;
     for (int index = 0; ; ) {
       final KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
@@ -105,7 +91,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
         return checkDecayAndSwap(counterOffset, collisions, key, loadAndMap);
       }
       if (key.equals(collision.key)) {
-        atomicIncrement(counterOffset + index);
+        counters.increment(counterOffset + index);
         return collision.val;
       }
       if (++index == collisions.length) {
@@ -159,28 +145,28 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     do {
-      int count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
+      int count = counters.getOpaque(counterIndex);
       if (count == 0) {
         COLLISIONS.setOpaque(collisions, counterIndex - counterOffset, entry);
-        COUNTERS.setOpaque(counters, counterIndex, initCount);
+        counters.initializeOpaque(counterIndex);
         while (++counterIndex < maxCounterIndex) {
-          count = ((int) COUNTERS.getOpaque(counters, counterIndex)) & MAX_COUNT;
+          count = counters.getOpaque(counterIndex);
           if (count == 0) {
             continue;
           }
-          COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
+          counters.setOpaque(counterIndex, count >> 1);
         }
         return;
       }
       // Counter misses may occur between these two calls.
-      COUNTERS.setOpaque(counters, counterIndex, (byte) (count >> 1));
+      counters.setOpaque(counterIndex, count >> 1);
       if (count < minCount) {
         minCount = count;
         minCounterIndex = counterIndex;
       }
     } while (++counterIndex < maxCounterIndex);
     COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
-    COUNTERS.setOpaque(counters, minCounterIndex, initCount);
+    counters.initializeOpaque(minCounterIndex);
   }
 
   /**
@@ -190,7 +176,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
   @SuppressWarnings("unchecked")
   public final V getIfPresent(final K key) {
     final int hash = hashCoder.applyAsInt(key) & mask;
-    final KeyVal<K, V>[] collisions = getCreateCollisions(hash);
+    final KeyVal<K, V>[] collisions = getBucket.apply(hash);
     int index = 0;
     do {
       final KeyVal<K, V> entry = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
@@ -198,7 +184,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
         return null;
       }
       if (key.equals(entry.key)) {
-        atomicIncrement((hash << maxCollisionsShift) + index);
+        counters.increment((hash << maxCollisionsShift) + index);
         return entry.val;
       }
     } while (++index < collisions.length);
@@ -211,7 +197,7 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
   @Override
   @SuppressWarnings("unchecked")
   public final V replace(final K key, final V val) {
-    final KeyVal<K, V>[] collisions = getCreateCollisions(hashCoder.applyAsInt(key) & mask);
+    final KeyVal<K, V>[] collisions = getBucket.apply(hashCoder.applyAsInt(key) & mask);
     int index = 0;
     do {
       final KeyVal<K, V> entry = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
@@ -254,19 +240,10 @@ abstract class BaseEntryCollisionCache<K, L, V> extends AtomicLogCounters
         });
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void nullBuckets() {
-    IntStream.range(0, hashTable.length).parallel().forEach(i -> hashTable[i] = null);
-  }
-
   @Override
   public String toString() {
-    return "maxCollisions=" + (1 << maxCollisionsShift)
-        + ", numCounters=" + counters.length
-        + ", initCount=" + initCount
-        + ", hashTableLength=" + hashTable.length;
+    return "CollisionCache{maxCollisions=" + (1 << maxCollisionsShift)
+        + ", hashTableLength=" + hashTable.length
+        + ", counters=" + counters + '}';
   }
 }

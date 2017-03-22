@@ -21,7 +21,7 @@ public class AtomicLogCountersTest {
 
   @Before
   public void before() {
-    this.counters = new AtomicLogCounters(numCounters, initCount, maxCounterVal);
+    this.counters = AtomicLogCounters.create(numCounters, initCount, maxCounterVal);
   }
 
   @Test
@@ -32,14 +32,14 @@ public class AtomicLogCountersTest {
     }
 
     final int counterIndex = 3;
-    counters.initCount(counterIndex);
+    counters.initializeOpaque(counterIndex);
 
     double deltaPercentage = .2;
     double minDelta = 7;
 
     int numThreads = Math.max(16, Runtime.getRuntime().availableProcessors() * 2);
     final ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-    final Runnable increment = () -> counters.atomicIncrement(counterIndex);
+    final Runnable increment = () -> counters.increment(counterIndex);
 
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0; ; ) {
       final Future[] futures = new Future[log - i];
@@ -65,7 +65,7 @@ public class AtomicLogCountersTest {
         futures[--j].get();
       }
 
-      final int actual = counters.getOpaqueCount(counterIndex);
+      final int actual = counters.getOpaque(counterIndex);
       final double delta = minDelta + expected * deltaPercentage;
       System.out.printf("%d <> %d +- %.1f%n", expected, actual, delta);
       assertTrue(actual >= previousExpected);
@@ -88,9 +88,9 @@ public class AtomicLogCountersTest {
     executor.shutdown();
     for (int i = 0; i < numCounters; ++i) {
       if (i == counterIndex) {
-        assertEquals(MAX_COUNT, counters.getOpaqueCount(i));
+        assertEquals(MAX_COUNT, counters.getOpaque(i));
       } else {
-        assertEquals(0, counters.getOpaqueCount(i));
+        assertEquals(0, counters.getOpaque(i));
       }
     }
   }
@@ -99,8 +99,8 @@ public class AtomicLogCountersTest {
   public void testDecay() {
     int initCount = 2;
     for (int i = 0; i < numCounters; ++i) {
-      counters.initCount(i, initCount);
-      assertEquals(initCount, counters.getOpaqueCount(i));
+      counters.setOpaque(i, initCount);
+      assertEquals(initCount, counters.getOpaque(i));
       initCount = Math.min(MAX_COUNT, initCount << 1);
     }
 
@@ -111,11 +111,11 @@ public class AtomicLogCountersTest {
         i < iterations; ++i) {
       counters.decay(0, numCounters, -1);
       decayed /= 2;
-      assertEquals(decayed, counters.getOpaqueCount(counterIndex));
+      assertEquals(decayed, counters.getOpaque(counterIndex));
     }
 
     for (int i = 0; i < numCounters; ++i) {
-      assertEquals(0, counters.getOpaqueCount(i));
+      assertEquals(0, counters.getOpaque(i));
     }
   }
 }

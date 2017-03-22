@@ -1,9 +1,12 @@
 package systems.comodal.collision.cache;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
 public final class CollisionBuilder<V> {
@@ -21,6 +24,7 @@ public final class CollisionBuilder<V> {
    * If increasing consider lazyInitBuckets to prevent unnecessary array creation.
    */
   static final double DEFAULT_SPARSE_FACTOR = 3.0;
+  static final VarHandle BUCKETS = MethodHandles.arrayElementVarHandle(Object[][].class);
   private final int capacity;
   private boolean strictCapacity = false;
   private Class<V> valueType;
@@ -29,6 +33,7 @@ public final class CollisionBuilder<V> {
   private int maxCounterVal = 1_048_576;
   private boolean lazyInitBuckets = false;
   private boolean storeKeys = true;
+
   CollisionBuilder(final int capacity) {
     this.capacity = capacity;
   }
@@ -70,20 +75,19 @@ public final class CollisionBuilder<V> {
     final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_SPARSE_BUCKET_SIZE;
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
-    final byte[] counters = new byte[Integer
-        .highestOneBit((int) (capacity * Math.max(1.0, sparseFactor)) - 1) << 1];
-    final int pow2LogFactor = AtomicLogCounters.calcLogFactorShift(maxCounterVal);
-    final int hashTableLength = counters.length >> maxCollisionsShift;
+    final AtomicLogCounters counters = AtomicLogCounters.create(
+        Integer.highestOneBit((int) (capacity * Math.max(1.0, sparseFactor)) - 1) << 1,
+        initCount, maxCounterVal);
+    final int hashTableLength = counters.getNumCounters() >> maxCollisionsShift;
     if (isStoreKeys()) {
       final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
       return new SparseEntryCollisionCache<>(
           capacity,
           strictCapacity,
           maxCollisionsShift,
-          counters,
-          initCount,
-          pow2LogFactor,
           hashTable,
+          createEntryGetBucket(hashTable, maxCollisionsShift),
+          counters,
           hashCoder, loader, mapper);
     }
     final V[][] hashTable = createHashTable(hashTableLength, maxCollisions);
@@ -92,10 +96,9 @@ public final class CollisionBuilder<V> {
         strictCapacity,
         valueType,
         maxCollisionsShift,
-        counters,
-        initCount,
-        pow2LogFactor,
         hashTable,
+        createGetBucket(hashTable, maxCollisionsShift),
+        counters,
         hashCoder, isValForKey, loader, mapper);
   }
 
@@ -114,27 +117,25 @@ public final class CollisionBuilder<V> {
     final int bucketSize = this.bucketSize > 0 ? this.bucketSize : DEFAULT_PACKED_BUCKET_SIZE;
     final int maxCollisions = Integer.highestOneBit(bucketSize - 1) << 1;
     final int maxCollisionsShift = Integer.numberOfTrailingZeros(maxCollisions);
-    final byte[] counters = new byte[Integer.highestOneBit(capacity - 1) << 1];
-    final int pow2LogFactor = AtomicLogCounters.calcLogFactorShift(maxCounterVal);
-    final int hashTableLength = counters.length >> maxCollisionsShift;
+    final AtomicLogCounters counters = AtomicLogCounters.create(
+        Integer.highestOneBit(capacity - 1) << 1, initCount, maxCounterVal);
+    final int hashTableLength = counters.getNumCounters() >> maxCollisionsShift;
     if (isStoreKeys()) {
       final KeyVal<K, V>[][] hashTable = createEntryHashTable(hashTableLength, maxCollisions);
       return new PackedEntryCollisionCache<>(
           maxCollisionsShift,
-          counters,
-          initCount,
-          pow2LogFactor,
           hashTable,
+          createEntryGetBucket(hashTable, maxCollisionsShift),
+          counters,
           hashCoder, loader, mapper);
     }
     final V[][] hashTable = createHashTable(hashTableLength, maxCollisions);
     return new PackedCollisionCache<>(
         valueType,
         maxCollisionsShift,
-        counters,
-        initCount,
-        pow2LogFactor,
         hashTable,
+        createGetBucket(hashTable, maxCollisionsShift),
+        counters,
         hashCoder, isValForKey, loader, mapper);
   }
 
@@ -151,6 +152,21 @@ public final class CollisionBuilder<V> {
         .newInstance(KeyVal.class, hashTableLength, maxCollisions);
   }
 
+  private <K, V> IntFunction<KeyVal<K, V>[]> createEntryGetBucket(final KeyVal<K, V>[][] hashTable,
+      final int maxCollisionsShift) {
+    return !lazyInitBuckets ? hash -> hashTable[hash]
+        : hash -> {
+          KeyVal<K, V>[] collisions = hashTable[hash];
+          if (collisions == null) {
+            collisions = (KeyVal<K, V>[]) Array
+                .newInstance(KeyVal.class, 1 << maxCollisionsShift);
+            final Object witness = BUCKETS.compareAndExchange(hashTable, hash, null, collisions);
+            return witness == null ? collisions : (KeyVal<K, V>[]) witness;
+          }
+          return collisions;
+        };
+  }
+
   @SuppressWarnings("unchecked")
   private V[][] createHashTable(final int hashTableLength, final int maxCollisions) {
     if (valueType == null) {
@@ -161,6 +177,20 @@ public final class CollisionBuilder<V> {
       return (V[][]) Array.newInstance(valueArrayType, hashTableLength);
     }
     return (V[][]) Array.newInstance(valueType, hashTableLength, maxCollisions);
+  }
+
+  private <V> IntFunction<V[]> createGetBucket(final V[][] hashTable,
+      final int maxCollisionsShift) {
+    return !lazyInitBuckets ? hash -> hashTable[hash]
+        : hash -> {
+          V[] collisions = hashTable[hash];
+          if (collisions == null) {
+            collisions = (V[]) Array.newInstance(valueType, 1 << maxCollisionsShift);
+            final Object witness = BUCKETS.compareAndExchange(hashTable, hash, null, collisions);
+            return witness == null ? collisions : (V[]) witness;
+          }
+          return collisions;
+        };
   }
 
   /**

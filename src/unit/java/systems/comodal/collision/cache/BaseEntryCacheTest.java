@@ -15,7 +15,7 @@ import org.junit.Test;
 
 abstract class BaseEntryCacheTest {
 
-  private static final String DIGEST_ALGO = "SHA3-256";
+  private static final String DIGEST_ALGO = "SHA-256";
   private static final ThreadLocal<MessageDigest> MESSAGE_DIGEST = ThreadLocal
       .withInitial(() -> {
         try {
@@ -138,19 +138,6 @@ abstract class BaseEntryCacheTest {
       assertNull(cache.replace(key, newHash));
       assertNull(cache.getIfPresent(key));
       assertNull(cache.replace(key, expected));
-      assertNull(cache.getIfPresent(key));
-    }
-  }
-
-  @Test
-  public void testNullBuckets() {
-    for (int key = 0; key < expectedHashes.length; key++) {
-      final String expected = expectedHashes[key];
-      cache.putIfAbsent(key, expected);
-      assertEquals(expected, cache.getIfPresent(key));
-    }
-    cache.nullBuckets();
-    for (int key = 0; key < expectedHashes.length; key++) {
       assertNull(cache.getIfPresent(key));
     }
   }
