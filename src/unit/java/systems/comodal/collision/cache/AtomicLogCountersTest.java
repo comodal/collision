@@ -1,5 +1,6 @@
 package systems.comodal.collision.cache;
 
+import static java.lang.System.Logger.Level.INFO;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static systems.comodal.collision.cache.AtomicLogCounters.MAX_COUNT;
@@ -41,6 +42,7 @@ public class AtomicLogCountersTest {
     final ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     final Runnable increment = () -> counters.increment(counterIndex);
 
+    final System.Logger logger = System.getLogger(AtomicLogCountersTest.class.getPackageName());
     for (int i = 0, log = 1 << 8, toggle = 0, previousExpected = 0; ; ) {
       final Future[] futures = new Future[log - i];
       final CountDownLatch countDownLatch = new CountDownLatch(numThreads + 1);
@@ -67,7 +69,7 @@ public class AtomicLogCountersTest {
 
       final int actual = counters.getOpaque(counterIndex);
       final double delta = minDelta + expected * deltaPercentage;
-      System.out.printf("%d <> %d +- %.1f%n", expected, actual, delta);
+      logger.log(INFO, String.format("%d <> %d +- %.1f%n", expected, actual, delta));
       assertTrue(actual >= previousExpected);
       assertEquals(expected, actual, delta);
       if (previousExpected == MAX_COUNT) {
