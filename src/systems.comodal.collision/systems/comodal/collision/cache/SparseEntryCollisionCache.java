@@ -2,10 +2,12 @@ package systems.comodal.collision.cache;
 
 import static systems.comodal.collision.cache.AtomicLogCounters.MAX_COUNT;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
 
 /**
  * @param <K> the type of keys used to map to values
@@ -13,9 +15,15 @@ import java.util.function.ToIntFunction;
  * @param <V> the type of mapped values
  * @author James P. Edwards
  */
-final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K, L, V> {
+final class SparseEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K, L, V> {
 
-  PackedEntryCollisionCache(
+  private final int capacity;
+  private final boolean strict;
+  private final AtomicInteger size;
+
+  SparseEntryCollisionCache(
+      final int capacity,
+      final boolean strictCapacity,
       final int maxCollisionsShift,
       final KeyVal<K, V>[][] hashTable,
       final IntFunction<KeyVal<K, V>[]> getBucket,
@@ -24,6 +32,9 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       final Function<K, L> loader,
       final BiFunction<K, L, V> mapper) {
     super(maxCollisionsShift, hashTable, getBucket, counters, hashCoder, loader, mapper);
+    this.capacity = capacity;
+    this.strict = strictCapacity;
+    this.size = new AtomicInteger();
   }
 
   /**
@@ -44,19 +55,27 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         if (loaded == null) {
           return null;
         }
-        final KeyVal<K, V> entry = new KeyVal(key, mapper.apply(key, loaded));
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) {  // Nothing to swap with and over capacity.
+            return mapper.apply(key, loaded);
+          }
+        } else if (size.get() > capacity) {
+          return checkDecayAndProbSwap(counterOffset, collisions, key, loaded, mapper);
+        }
+        final KeyVal<K, V> entry = new KeyVal<>(key, mapper.apply(key, loaded));
         do {
-          collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchange(collisions, index, null, entry);
+          collision = (KeyVal<K, V>) COLLISIONS.compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             counters.initializeOpaque(counterOffset + index);
+            size.getAndIncrement();
             return entry.val;
           }
           if (key.equals(collision.key)) {
             counters.increment(counterOffset + index);
             return collision.val;
           }
-        } while (++index < collisions.length);
+        } while (++index < collisions.length && size.get() <= capacity);
         return checkDecayAndProbSwap(counterOffset, collisions, entry);
       }
       if (key.equals(collision.key)) {
@@ -67,6 +86,68 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     final I loaded = loader.apply(key);
     return loaded == null ? null
         : checkDecayAndProbSwap(counterOffset, collisions, key, loaded, mapper);
+  }
+
+  /**
+   * This method assumes either or both a full bucket and to be over capacity.
+   */
+  @SuppressWarnings("unchecked")
+  private <I> V checkDecayAndProbSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
+      final K key, final I loaded, final BiFunction<K, I, V> mapper) {
+    int index = 0;
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = MAX_COUNT;
+    synchronized (collisions) {
+      for (; ; ) {
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
+        if (collision == null) { // Assume over capacity.
+          final V val = mapper.apply(key, loaded);
+          final KeyVal<K, V> entry = new KeyVal<>(key, val);
+          if (index == 0) { // Strict capacity checked in parent call.
+            collision = (KeyVal<K, V>) COLLISIONS
+                .compareAndExchange(collisions, index, null, entry);
+            if (collision == null) {
+              counters.initializeOpaque(counterIndex);
+              size.getAndIncrement();
+              return val;
+            }
+            if (key.equals(collision.key)) {
+              counters.increment(counterIndex);
+              return collision.val;
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
+          counters.initializeOpaque(minCounterIndex);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
+        if (key.equals(collision.key)) {
+          counters.increment(counterIndex);
+          return collision.val;
+        }
+
+        int count = counters.getOpaque(counterIndex);
+        if (count < minCount) {
+          minCount = count;
+          minCounterIndex = counterIndex;
+        }
+        ++counterIndex;
+        if (++index == collisions.length) {
+          final V val = mapper.apply(key, loaded);
+          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, new KeyVal<>(key, val));
+          counters.initializeOpaque(minCounterIndex);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
+          counters.decay(counterOffset, counterIndex, minCounterIndex);
+          return val;
+        }
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -85,6 +166,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
                 .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               counters.initializeOpaque(counterIndex);
+              size.getAndIncrement();
               return entry.val;
             }
             if (entry.key.equals(collision.key)) {
@@ -95,7 +177,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           }
           COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
           counters.initializeOpaque(minCounterIndex);
-          counters.decay(counterOffset, counterIndex, minCounterIndex);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
           return entry.val;
         }
 
@@ -113,65 +195,12 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         if (++index == collisions.length) {
           COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
           counters.initializeOpaque(minCounterIndex);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return entry.val;
+          }
           counters.decay(counterOffset, counterIndex, minCounterIndex);
           return entry.val;
-        }
-      }
-    }
-  }
-
-  /**
-   * This method assumes a full bucket or (XOR) over capacity and checks for both (AND).
-   */
-  @SuppressWarnings("unchecked")
-  private <I> V checkDecayAndProbSwap(final int counterOffset, final KeyVal<K, V>[] collisions,
-      final K key, final I loaded, final BiFunction<K, I, V> mapper) {
-    int index = 0;
-    int counterIndex = counterOffset;
-    int minCounterIndex = counterOffset;
-    int minCount = MAX_COUNT;
-    synchronized (collisions) {
-      for (; ; ) {
-        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
-        if (collision == null) { // Assume over capacity.
-          final V val = mapper.apply(key, loaded);
-          final KeyVal<K, V> entry = new KeyVal(key, val);
-          if (index == 0) { // Strict capacity checked in parent call.
-            collision = (KeyVal<K, V>) COLLISIONS
-                .compareAndExchange(collisions, index, null, entry);
-            if (collision == null) {
-              counters.initializeOpaque(counterIndex);
-              return val;
-            }
-            if (key.equals(collision.key)) {
-              counters.increment(counterIndex);
-              return collision.val;
-            }
-            return val; // Don't cache, lost tie breaker.
-          }
-          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
-          counters.initializeOpaque(minCounterIndex);
-          counters.decay(counterOffset, counterIndex, minCounterIndex);
-          return val;
-        }
-
-        if (key.equals(collision.key)) {
-          counters.increment(counterIndex);
-          return collision.val;
-        }
-
-        int count = counters.getOpaque(counterIndex);
-        if (count < minCount) {
-          minCount = count;
-          minCounterIndex = counterIndex;
-        }
-        ++counterIndex;
-        if (++index == collisions.length) {
-          final V val = mapper.apply(key, loaded);
-          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, new KeyVal(key, val));
-          counters.initializeOpaque(minCounterIndex);
-          counters.decay(counterOffset, counterIndex, minCounterIndex);
-          return val;
         }
       }
     }
@@ -184,21 +213,36 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
   @SuppressWarnings("unchecked")
   V checkDecayAndSwap(final int counterOffset, final KeyVal<K, V>[] collisions, final K key,
       final Function<K, V> loadAndMap) {
+    if (size.get() > capacity) {
+      return checkDecayAndProbSwap(counterOffset, collisions, key, loadAndMap);
+    }
     int index = 0;
     synchronized (collisions) {
-      for (; ; ) { // Double-check locked volatile before swapping LFU to help prevent duplicates.
+      for (; ; ) {
         KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
         if (collision == null) {
           final V val = loadAndMap.apply(key);
           if (val == null) {
             return null;
           }
-          final KeyVal<K, V> entry = new KeyVal(key, val);
+          if (index == 0) {
+            // If not strict, allow first entry into first collision index.
+            if (strict && size.get() > capacity) {
+              // Nothing to swap with and over capacity.
+              return val;
+            }
+          } else if (size.get() > capacity) {
+            decaySwapAndDrop(counterOffset, counterOffset + index, collisions,
+                new KeyVal<>(key, val));
+            return val;
+          }
+          final KeyVal<K, V> entry = new KeyVal<>(key, val);
           do {
             collision = (KeyVal<K, V>) COLLISIONS
                 .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               counters.initializeOpaque(counterOffset + index);
+              size.getAndIncrement();
               return val;
             }
             if (key.equals(collision.key)) {
@@ -218,8 +262,13 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           if (val == null) {
             return null;
           }
+          if (size.get() > capacity) {
+            decaySwapAndDrop(counterOffset, counterOffset + collisions.length, collisions,
+                new KeyVal<>(key, val));
+            return val;
+          }
           decayAndSwap(counterOffset, counterOffset + collisions.length, collisions,
-              new KeyVal(key, val));
+              new KeyVal<>(key, val));
           return val;
         }
       }
@@ -245,12 +294,24 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           if (val == null) {
             return null;
           }
-          final KeyVal<K, V> entry = new KeyVal(key, val);
+          if (index == 0) {
+            // If not strict, allow first entry into first collision index.
+            if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+              return val;
+            }
+          } else if (size.get() > capacity) {
+            COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, new KeyVal<>(key, val));
+            counters.initializeOpaque(minCounterIndex);
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
+          final KeyVal<K, V> entry = new KeyVal<>(key, val);
           do {
             collision = (KeyVal<K, V>) COLLISIONS
                 .compareAndExchange(collisions, index, null, entry);
             if (collision == null) {
               counters.initializeOpaque(counterOffset + index);
+              size.getAndIncrement();
               return val;
             }
             if (key.equals(collision.key)) {
@@ -280,13 +341,116 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           if (val == null) {
             return null;
           }
-          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, new KeyVal(key, val));
+          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, new KeyVal<>(key, val));
           counters.initializeOpaque(minCounterIndex);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
           counters.decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
       }
     }
+  }
+
+  private void decayAndDrop(final int counterOffset, final int maxCounterIndex,
+      final int skipIndex, final KeyVal<K, V>[] collisions) {
+    int counterIndex = counterOffset;
+    do {
+      if (counterIndex == skipIndex) {
+        continue;
+      }
+      int count = counters.getOpaque(counterIndex);
+      if (count == 0) {
+        if (counterIndex < skipIndex) {
+          continue;
+        }
+        if (size.getAndDecrement() <= capacity) {
+          size.getAndIncrement();
+          continue;
+        }
+        for (int collisionIndex = counterIndex - counterOffset,
+            nextCollisionIndex = collisionIndex + 1; ; ++collisionIndex, ++nextCollisionIndex) {
+          if (nextCollisionIndex == collisions.length) {
+            COLLISIONS.setOpaque(collisions, collisionIndex, null);
+            return;
+          }
+          Object next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
+          if (next == null) {
+            COLLISIONS.setOpaque(collisions, collisionIndex, null);
+            next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
+            if (next == null
+                || COLLISIONS.compareAndExchange(collisions, collisionIndex, null, next) != null) {
+              return;
+            }
+          } else {
+            COLLISIONS.setOpaque(collisions, collisionIndex, next);
+          }
+          // Counter misses may occur during this transition.
+          count = counters.getOpaque(++counterIndex);
+          counters.setOpaque(counterIndex - 1, count >> 1);
+        }
+      }
+      // Counter misses may occur between these two calls.
+      counters.setOpaque(counterIndex, count >> 1);
+    } while (++counterIndex < maxCounterIndex);
+  }
+
+  private void decaySwapAndDrop(final int counterOffset, final int maxCounterIndex,
+      final KeyVal<K, V>[] collisions, final KeyVal<K, V> entry) {
+    int counterIndex = counterOffset;
+    int minCounterIndex = counterOffset;
+    int minCount = MAX_COUNT;
+    do {
+      int count = counters.getOpaque(counterIndex);
+      if (count == 0) {
+        COLLISIONS.setOpaque(collisions, counterIndex - counterOffset, entry);
+        counters.initializeOpaque(counterIndex);
+        while (++counterIndex < maxCounterIndex) {
+          count = counters.getOpaque(counterIndex);
+          if (count > 0) {
+            counters.setOpaque(counterIndex, count >> 1);
+            continue;
+          }
+          if (size.getAndDecrement() <= capacity) {
+            size.getAndIncrement();
+            continue;
+          }
+          for (int collisionIndex = counterIndex - counterOffset,
+              nextCollisionIndex = collisionIndex + 1; ; ++collisionIndex, ++nextCollisionIndex) {
+            if (nextCollisionIndex == collisions.length) {
+              COLLISIONS.setOpaque(collisions, collisionIndex, null);
+              return;
+            }
+            Object next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
+            if (next == null) {
+              COLLISIONS.setOpaque(collisions, collisionIndex, null);
+              next = COLLISIONS.getOpaque(collisions, nextCollisionIndex);
+              if (next == null
+                  || COLLISIONS.compareAndExchange(collisions, collisionIndex, null, next)
+                  != null) {
+                return;
+              }
+            } else {
+              COLLISIONS.setOpaque(collisions, collisionIndex, next);
+            }
+            // Counter misses may occur during this transition.
+            count = counters.getOpaque(++counterIndex);
+            counters.setOpaque(counterIndex - 1, count >> 1);
+          }
+        }
+        return;
+      }
+      // Counter misses may occur between these two calls.
+      counters.setOpaque(counterIndex, count >> 1);
+      if (count < minCount) {
+        minCount = count;
+        minCounterIndex = counterIndex;
+      }
+    } while (++counterIndex < maxCounterIndex);
+    COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
+    counters.initializeOpaque(minCounterIndex);
   }
 
   /**
@@ -302,20 +466,28 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     do {
       KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+            return val;
+          }
+        } else if (size.get() > capacity) {
+          break;
+        }
         if (entry == null) {
-          entry = new KeyVal(key, val);
+          entry = new KeyVal<>(key, val);
         }
         do {
-          collision = (KeyVal<K, V>) COLLISIONS
-              .compareAndExchange(collisions, index, null, entry);
+          collision = (KeyVal<K, V>) COLLISIONS.compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             counters.initializeOpaque((hash << maxCollisionsShift) + index);
+            size.getAndIncrement();
             return val;
           }
           if (key.equals(collision.key)) {
             return collision.val; // If another thread raced to PUT, let it win.
           }
-        } while (++index < collisions.length);
+        } while (++index < collisions.length && size.get() <= capacity);
         break;
       }
       if (collision.val == val) {
@@ -323,7 +495,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       }
       if (key.equals(collision.key)) {
         if (entry == null) {
-          entry = new KeyVal(key, val);
+          entry = new KeyVal<>(key, val);
         }
         final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
             .compareAndExchange(collisions, index, collision, entry);
@@ -342,14 +514,38 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
     synchronized (collisions) {
-      for (; ; ) {
-        final KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
+      for (; ; ++counterIndex) {
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
+        if (collision == null) {  // Assume over capacity.
+          if (entry == null) {
+            entry = new KeyVal<>(key, val);
+          }
+          if (index == 0) {  // Strict capacity checked above.
+            collision = (KeyVal<K, V>) COLLISIONS
+                .compareAndExchange(collisions, index, null, entry);
+            if (collision == null) {
+              counters.initializeOpaque(counterIndex);
+              size.getAndIncrement();
+              return val;
+            }
+            if (key.equals(collision.key)) {
+              return collision.val; // If another thread raced to PUT, let it win.
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
+          counters.initializeOpaque(minCounterIndex);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
         if (collision.val == val) {
           return val;
         }
+
         if (key.equals(collision.key)) {
           if (entry == null) {
-            entry = new KeyVal(key, val);
+            entry = new KeyVal<>(key, val);
           }
           final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
               .compareAndExchange(collisions, index, collision, entry);
@@ -366,13 +562,17 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           minCount = count;
           minCounterIndex = counterIndex;
         }
-        ++counterIndex;
+
         if (++index == collisions.length) {
           if (entry == null) {
-            entry = new KeyVal(key, val);
+            entry = new KeyVal<>(key, val);
           }
           COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
           counters.initializeOpaque(minCounterIndex);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
           counters.decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
@@ -393,18 +593,27 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     do {
       KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
-        entry = new KeyVal(key, val);
+        if (index == 0) {
+          // If not strict, allow first entry into first collision index.
+          if (strict && size.get() > capacity) { // Nothing to swap with and over capacity.
+            return val;
+          }
+        } else if (size.get() > capacity) {
+          break;
+        }
+        entry = new KeyVal<>(key, val);
         do {
           collision = (KeyVal<K, V>) COLLISIONS
               .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             counters.initializeOpaque((hash << maxCollisionsShift) + index);
+            size.getAndIncrement();
             return val;
           }
           if (key.equals(collision.key)) {
             return collision.val;
           }
-        } while (++index < collisions.length);
+        } while (++index < collisions.length && size.get() <= capacity);
         break;
       }
       if (key.equals(collision.key)) {
@@ -419,10 +628,34 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     int minCount = MAX_COUNT;
     synchronized (collisions) {
       for (; ; ) {
-        final KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
+        KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
+        if (collision == null) {  // Assume over capacity.
+          if (entry == null) {
+            entry = new KeyVal<>(key, val);
+          }
+          if (index == 0) {  // Strict capacity checked above.
+            collision = (KeyVal<K, V>) COLLISIONS
+                .compareAndExchange(collisions, index, null, entry);
+            if (collision == null) {
+              counters.initializeOpaque(counterIndex);
+              size.getAndIncrement();
+              return val;
+            }
+            if (key.equals(collision.key)) {
+              return collision.val;
+            }
+            return val; // Don't cache, lost tie breaker.
+          }
+          COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
+          counters.initializeOpaque(minCounterIndex);
+          decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+          return val;
+        }
+
         if (key.equals(collision.key)) {
           return collision.val;
         }
+
         int count = counters.getOpaque(counterIndex);
         if (count < minCount) {
           minCount = count;
@@ -431,10 +664,14 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
         ++counterIndex;
         if (++index == collisions.length) {
           if (entry == null) {
-            entry = new KeyVal(key, val);
+            entry = new KeyVal<>(key, val);
           }
           COLLISIONS.setOpaque(collisions, minCounterIndex - counterOffset, entry);
           counters.initializeOpaque(minCounterIndex);
+          if (size.get() > capacity) {
+            decayAndDrop(counterOffset, counterIndex, minCounterIndex, collisions);
+            return val;
+          }
           counters.decay(counterOffset, counterIndex, minCounterIndex);
           return val;
         }
@@ -454,18 +691,22 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     do {
       KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
-        final KeyVal<K, V> entry = new KeyVal(key, val);
+        if (size.get() > capacity) {
+          return null;
+        }
+        final KeyVal<K, V> entry = new KeyVal<>(key, val);
         do {
           collision = (KeyVal<K, V>) COLLISIONS
               .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             counters.initializeOpaque((hash << maxCollisionsShift) + index);
+            size.getAndIncrement();
             return val;
           }
           if (key.equals(collision.key)) {
             return collision.val;
           }
-        } while (++index < collisions.length);
+        } while (++index < collisions.length && size.get() <= capacity);
         return null;
       }
       if (key.equals(collision.key)) {
@@ -488,20 +729,24 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     do {
       KeyVal<K, V> collision = (KeyVal<K, V>) COLLISIONS.getOpaque(collisions, index);
       if (collision == null) {
+        if (size.get() > capacity) {
+          return null;
+        }
         if (entry == null) {
-          entry = new KeyVal(key, val);
+          entry = new KeyVal<>(key, val);
         }
         do {
           collision = (KeyVal<K, V>) COLLISIONS
               .compareAndExchange(collisions, index, null, entry);
           if (collision == null) {
             counters.initializeOpaque((hash << maxCollisionsShift) + index);
+            size.getAndIncrement();
             return val;
           }
           if (key.equals(collision.key)) {
             return collision.val; // If another thread raced to PUT, let it win.
           }
-        } while (++index < collisions.length);
+        } while (++index < collisions.length && size.get() <= capacity);
         return null;
       }
       if (collision.val == val) {
@@ -509,7 +754,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
       }
       if (key.equals(collision.key)) {
         if (entry == null) {
-          entry = new KeyVal(key, val);
+          entry = new KeyVal<>(key, val);
         }
         final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
             .compareAndExchange(collisions, index, collision, entry);
@@ -540,6 +785,7 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
           return false;
         }
         if (key.equals(collision.key)) {
+          size.getAndDecrement();
           final int counterOffset = hash << maxCollisionsShift;
           int counterIndex = counterOffset + index;
           for (int nextIndex = index + 1; ; ++index, ++nextIndex) {
@@ -568,8 +814,34 @@ final class PackedEntryCollisionCache<K, L, V> extends BaseEntryCollisionCache<K
     return false;
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public void clear() {
+    synchronized (hashTable) {
+      IntStream.range(0, hashTable.length).parallel().forEach(i -> {
+        final KeyVal<K, V>[] collisions = (KeyVal<K, V>[]) COLLISIONS.getOpaque(hashTable, i);
+        if (collisions == null) {
+          return;
+        }
+        int index = 0;
+        do {
+          final Object collision = COLLISIONS.getAndSet(collisions, index, null);
+          if (collision != null) {
+            size.getAndDecrement();
+          }
+        } while (++index < collisions.length);
+      });
+    }
+  }
+
   @Override
   public String toString() {
-    return "PackedEntryCollisionCache{" + super.toString() + '}';
+    return "SparseEntryCollisionCache{capacity=" + capacity
+        + ", strictCapacity=" + strict
+        + ", size=" + size.get()
+        + ", " + super.toString() + '}';
   }
 }

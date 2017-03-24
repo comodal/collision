@@ -57,6 +57,7 @@ public final class CollisionBuilder<V> {
    * Defaults to 3.0 and has a minimum of 1.0.
    * @return A newly built {@link CollisionCache CollisionCache}.
    */
+  @SuppressWarnings("unchecked")
   public <K> CollisionCache<K, V> buildSparse(final double sparseFactor) {
     return buildSparse(
         sparseFactor,
@@ -102,6 +103,7 @@ public final class CollisionBuilder<V> {
         hashCoder, isValForKey, loader, mapper);
   }
 
+  @SuppressWarnings("unchecked")
   public <K> CollisionCache<K, V> buildPacked() {
     return buildPacked(
         (ToIntFunction<K>) DEFAULT_HASH_CODER,
@@ -152,6 +154,7 @@ public final class CollisionBuilder<V> {
         .newInstance(KeyVal.class, hashTableLength, maxCollisions);
   }
 
+  @SuppressWarnings("unchecked")
   private <K, V> IntFunction<KeyVal<K, V>[]> createEntryGetBucket(final KeyVal<K, V>[][] hashTable,
       final int maxCollisionsShift) {
     return !lazyInitBuckets ? hash -> hashTable[hash]
@@ -179,6 +182,7 @@ public final class CollisionBuilder<V> {
     return (V[][]) Array.newInstance(valueType, hashTableLength, maxCollisions);
   }
 
+  @SuppressWarnings("unchecked")
   private <V> IntFunction<V[]> createGetBucket(final V[][] hashTable,
       final int maxCollisionsShift) {
     return !lazyInitBuckets ? hash -> hashTable[hash]

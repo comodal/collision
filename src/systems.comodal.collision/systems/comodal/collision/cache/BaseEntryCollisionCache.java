@@ -140,7 +140,7 @@ abstract class BaseEntryCollisionCache<K, L, V> implements LoadingCollisionCache
    * @param entry The value to put in place of the least frequently used value.
    */
   final void decayAndSwap(final int counterOffset, final int maxCounterIndex,
-      final KeyVal[] collisions, final KeyVal<K, V> entry) {
+      final KeyVal<K, V>[] collisions, final KeyVal<K, V> entry) {
     int counterIndex = counterOffset;
     int minCounterIndex = counterOffset;
     int minCount = MAX_COUNT;
@@ -209,7 +209,7 @@ abstract class BaseEntryCollisionCache<K, L, V> implements LoadingCollisionCache
       }
       if (key.equals(entry.key)) {
         final KeyVal<K, V> witness = (KeyVal<K, V>) COLLISIONS
-            .compareAndExchange(collisions, index, entry, new KeyVal(key, val));
+            .compareAndExchange(collisions, index, entry, new KeyVal<>(key, val));
         if (witness == entry) {
           return val;
         }
@@ -229,7 +229,7 @@ abstract class BaseEntryCollisionCache<K, L, V> implements LoadingCollisionCache
     IntStream.range(0, hashTable.length)
         .parallel()
         .forEach(i -> {
-          final KeyVal[] collisions = hashTable[i];
+          final KeyVal<K, V>[] collisions = hashTable[i];
           if (collisions == null) {
             return;
           }

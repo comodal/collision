@@ -100,6 +100,7 @@ public final class KeyedCollisionBuilder<K, V> {
     return new LoadingCollisionBuilder<>(this, loader, mapper);
   }
 
+  @SuppressWarnings("unchecked")
   public ToIntFunction<K> getHashCoder() {
     return hashCoder == null ? (ToIntFunction<K>) DEFAULT_HASH_CODER : hashCoder;
   }
@@ -117,6 +118,7 @@ public final class KeyedCollisionBuilder<K, V> {
     return this;
   }
 
+  @SuppressWarnings("unchecked")
   public BiPredicate<K, V> getIsValForKey() {
     return isValForKey == null ? (BiPredicate<K, V>) DEFAULT_IS_VAL_FOR_KEY : isValForKey;
   }
