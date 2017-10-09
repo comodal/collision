@@ -15,8 +15,8 @@ apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/j
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/bintray-maven.gradle'
-// apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/checks.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/jmh.gradle'
+apply plugin: 'jacoco'
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 
@@ -45,5 +45,16 @@ sourceSets {
     java {
       srcDir 'src/unit/java'
     }
+  }
+}
+
+jacoco {
+  toolVersion = "+"
+}
+
+jacocoTestReport {
+  reports {
+    xml.enabled = true
+    html.enabled = true
   }
 }
