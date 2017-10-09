@@ -1,17 +1,16 @@
 buildscript {
-    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
-    apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/plugins.gradle'
-    dependencies {
-        classpath "$axion"
-        classpath "$bintray"
-        classpath "$jmh"
-    }
+  apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/plugins.gradle'
+  apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/plugins.gradle'
+  dependencies {
+    classpath "$axion"
+    classpath "$bintray"
+    classpath "$jmh"
+  }
 }
 
 ext {
-    desc = 'Java 9 Loading Cache'
+  desc = 'Java 9 Loading Cache'
 }
-apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/travisci.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/java.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/axion.gradle'
 apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/comodal.gradle'
@@ -21,34 +20,30 @@ apply from: 'https://raw.githubusercontent.com/comodal/gradle-conf/master/java/j
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 
-tasks.withType(Test) {
-    jvmArgs += ['-XX:+IgnoreUnrecognizedVMOptions', '--permit-illegal-access']
-}
-
 repositories {
-    maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
+  maven { url "http://oss.sonatype.org/content/repositories/snapshots" }
 }
 
 configurations.all {
-    resolutionStrategy.cacheDynamicVersionsFor 1, 'minutes'
-    resolutionStrategy.cacheChangingModulesFor 1, 'minutes'
+  resolutionStrategy.cacheDynamicVersionsFor 1, 'minutes'
+  resolutionStrategy.cacheChangingModulesFor 1, 'minutes'
 }
 
 dependencies {
-    jmh 'com.github.ben-manes.caffeine:caffeine:+'
-    jmh 'org.cache2k:cache2k-api:+'
-    jmh 'org.cache2k:cache2k-core:+'
+  jmh 'com.github.ben-manes.caffeine:caffeine:+'
+  jmh 'org.cache2k:cache2k-api:+'
+  jmh 'org.cache2k:cache2k-core:+'
 }
 
 sourceSets {
-    main {
-        java {
-            srcDir 'src/systems.comodal.collision'
-        }
+  main {
+    java {
+      srcDir 'src/systems.comodal.collision'
     }
-    test {
-        java {
-            srcDir 'src/unit/java'
-        }
+  }
+  test {
+    java {
+      srcDir 'src/unit/java'
     }
+  }
 }

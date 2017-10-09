@@ -11,11 +11,6 @@ CollisionCache<Key, Value> cache = CollisionCache
   .buildSparse();
 ```
 
-### Gradle Java 9 Build Workaround
-```sh
-export JAVA_OPTS='--permit-illegal-access'
-```
-
 ### Design Features
 * Optional key storage.  If equality can be tested between keys and values with a supplied predicate, e.g., `boolean isValForKey(K key, V val)`, then keys will not be stored.
   * For use cases with large keys relative to the size of values, using that space to store more values may dramatically improve performance.
@@ -25,45 +20,6 @@ export JAVA_OPTS='--permit-illegal-access'
 * Eviction is scoped to individual hash buckets using an LFU strategy.  With this limited scope, eviction is less intelligent but has very little overhead.
 * Compact [concurrent 8-bit atomic logarithmic counters](src/systems.comodal.collision/java/systems/comodal/collision/cache/AtomicLogCounters.java#L52) inspired by Salvatore Sanfilippo's [blog post on adding LFU caching to Redis](http://antirez.com/news/109), see the section on _Implementing LFU in 24 bits of space_.
 * Atomic or aggressive loading of missing values.
-
-### Benchmarks
-
-These benchmarks are intended to mimic those found in the [Caffeine Cache](https://github.com/ben-manes/caffeine/wiki/Benchmarks) project.  [JMH](http://openjdk.java.net/projects/code-tools/jmh/) was used to run the benchmarks.
-
-###### Environment:
-* Intel® Xeon(R) CPU E5-2687W v3 @ 3.10GHz × 20 / 128GB Memory / Ubuntu 16.04
-* VM: JDK 9-ea+138 / options: -server
-
-#### Loading Cache: Zipf Benchmarks
-
-Tests the loading function against a [Zipf](https://en.wikipedia.org/wiki/Zipf%27s_law) distribution of keys.
-
-```java
-CollisionCache
-  .withCapacity(capacity, Long.class)
-  .setStrictCapacity(true) // default
-  .setLoader(
-    key -> {
-      amortizedSleep(); // Sleeps 1ms every (10.0 / 1000.0)% of calls.
-      return key;
-    }, (key, num) -> punishMiss(num))
-  .buildSparse(5.0);
-```
-##### [Static Zipf Distribution](src/jmh/java/systems/comodal/collision/benchmarks/LoadStaticZipfBenchmark.java#L70)
-
-The same collection of keys is used for all iterations.
-
-TODO ```![loading-cache-static-zipf](benchmark/loading-cache-static-zipf.png)```
-
-> JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
-
-##### [Moving Zipf Distribution](src/jmh/java/systems/comodal/collision/benchmarks/LoadMovingZipfBenchmark.java#L52)
-
-A new collection of keys is generated every iteration from the same Zipf generator across a range of 10 billion keys.
-
-![loading-cache-moving-zipf](https://cdn.rawgit.com/comodal/collision/master/benchmark/loading-cache-moving-zipf.svg)
-
-> JMH 1.15, 32 threads, 10 warm-up & 20 measurement iterations.
 
 ### Implementation Notes & Cache Types
 * Collision caches are backed by a large two dimensional array of generic values or [KeyVal](src/systems.comodal.collision/java/systems/comodal/collision/cache/KeyVal.java) wrappers if storing keys.  Each hash bucket is fixed in length and should be kept small.

@@ -5,3 +5,5 @@ build/
 /collision.iws
 .idea/
 mods
+*.iml
+out/
