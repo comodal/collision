@@ -1,11 +1,9 @@
 sudo: required
 dist: trusty
 group: edge
+
 language: java
 jdk: oraclejdk9
-
-env:
-  - JAVA_OPTS='--permit-illegal-access'
 
 notifications:
   email:
@@ -21,8 +19,20 @@ cache:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
 
-install: ./gradlew -version
+stages:
+  - build
+  - name: publish
+    if: tag IS present
 
-script: ./gradlew check
-
-after_success: if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ ! -z "$TRAVIS_TAG" ] ; then ./gradlew bintrayUpload; else ./gradlew jacocoTestReport; bash <(curl -s https://codecov.io/bash); fi
+jobs:
+  include:
+    - stage: build
+      install: skip
+      script:
+      - ./gradlew check
+      - ./gradlew jacocoTestReport
+      - bash <(curl -s https://codecov.io/bash);
+    - stage: publish
+      install: skip
+      script:
+      - ./gradlew bintrayUpload
